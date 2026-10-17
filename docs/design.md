@@ -205,16 +205,18 @@ stateDiagram-v2
 	processing --> failed: Paperless could not consume it
 	failed --> waiting: retry, or signed in again
 	failed --> processing: signed in again, back to its check
+	failed --> preparing: retry after a failed PDF
 	done --> [*]
 ```
 
 - **Retries.** A send retries after 5 seconds, doubling up to 30 minutes. Network errors never give up, and the screen shows the attempt count.
 - **Following the task.** The app checks the task after 2 seconds, doubling up to one minute. The server's websocket accepts only a browser session cookie, so the app polls.
-- **Sign-in expired.** A 401 holds every job of that account until the user signs in again. Each job remembers its step, so a job that was checking a task goes back to checking it and never resends a file the server has.
+- **Sign-in expired.** A 401 holds every job of that account until the user signs in again. Each job remembers its step, so a job that was checking a task goes back to checking it and never resends a file the server has. The account's id is derived from the server address and the username, so the same sign-in finds the same jobs.
 - **Missing permission.** A 403 means the account may not add documents. Signing in again would not help, so the message says which permission is missing and offers Retry.
 - **One sender per job.** Before it sends, the runner claims the job with a write that succeeds only if the row is unchanged since it was read. A second runner that loaded the same job loses the claim and sends nothing. One drain runs at a time, and the recovery of jobs left in `sending` runs once when the app process starts.
 - **A task that never answers.** After ten checks in a row with no answer, the job goes back to the lookup by file name.
 - **Delete.** Allowed while a job waits, after it fails, and after it is done. Not while it is sending or processing, because the server already has the file.
+- **Files.** A document's page files stay until its PDF exists, so a failed PDF can be built again with Retry. They go when the PDF is built, when one is missing, or when the user deletes the job. The PDF goes when the job is done. The batch is cleared only after its jobs exist, and a batch found with jobs for some of its documents drops those documents when it is loaded instead of queuing them again.
 - **Too large.** A 413 comes from a proxy in front of Paperless, which sets no limit of its own. The message says "Your server's upload limit is smaller than this file" and names the size.
 
 ### When uploads run
@@ -244,7 +246,7 @@ These are named before any logic. Ids from the server are branded numbers, so a 
 
 ```ts
 type ServerAccount = {
-	id: AccountId;                 // made on the phone
+	id: AccountId;                 // a hash of the server address and the username
 	serverUrl: ServerUrl;          // parsed and normalized at sign-in
 	username: string;
 	serverVersion: string;         // "3.3.2", from the X-Version header
@@ -356,7 +358,7 @@ A job in `sending` holds no task id, and a job in `processing` always holds one.
 |---|---|---|
 | Accounts | SQLite | Until the user signs out |
 | Token and extra header values | expo-secure-store, which keeps an AES key in the Android Keystore | Until sign-out |
-| Batches being built, and their page files | SQLite and the app's files folder | Until queued or discarded |
+| Batches being built, and their page files | SQLite and the app's files folder | Until discarded. A queued document's files pass to its job. |
 | Upload jobs and their PDFs | SQLite and the app's files folder | The PDF is deleted when the job is done. The row is kept for a week to show history. |
 | Server data: lists, labels, details | TanStack Query cache, saved to SQLite | Shown at once, refreshed in the background |
 | Thumbnails | expo-image disk cache, keyed by server, document, and modified time | Android may clear it |

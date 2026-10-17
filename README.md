@@ -9,7 +9,7 @@ Waraq needs Paperless-ngx 3.0 or newer. It talks to the REST API at version 10.
 - `app/` holds the screens, one file per route, for expo-router. `(tabs)/` is Inbox, Documents, and Uploads. `sign-in/` is shown only while no account is stored.
 - `src/paperless/` is the API client. It uses the `fetch` it is given, and parses every response with Zod before the rest of the app sees it. Zod is the one dependency added for that.
 - `src/signin/` holds the sign-in steps and the checklist that a failed sign-in shows. It is plain TypeScript, so the tests run it in Node.
-- `src/account/` stores the one account. The address, user, and server version go in SQLite. The token and the custom header values go in the Android Keystore through expo-secure-store.
+- `src/account/` stores the one account. The address, user, and server version go in SQLite. The token and the custom header values go in the Android Keystore through expo-secure-store. The account's id is a hash of the server address and the username, so signing in again to the same server as the same user gives the same id, and the uploads held for that account carry on.
 - `src/documents/` turns the filter sheet and the server's saved views into list parameters, and works out which fields an edit changed. `src/inbox/` groups the inbox and removes a row when it is marked done. Both are plain TypeScript.
 - `src/cache/` names every TanStack Query key and saves the cache to SQLite. `src/files/` keeps opened documents in the cache folder.
 - `modules/scanner/` is a local Expo module in Kotlin. It opens Google's document scanner, writes PDFs, and brings in files picked on the phone or shared from other apps. It imports nothing from Waraq, so it can move into a package of its own.
@@ -71,6 +71,7 @@ dev/android.sh boot
 dev/android.sh install
 dev/android.sh shot inbox  # .dev-data/shots/inbox.png
 dev/android.sh flow        # the documents flow against http://10.0.2.2:8010, described below
+dev/android.sh upload      # the upload flow against the same server, described below
 dev/android.sh scan        # the scan flow, described below
 dev/android.sh pdf-check   # the PDF writer's checks on the emulator, then its 10-page PDF opened on the Mac
 dev/android.sh logs
@@ -78,7 +79,11 @@ dev/android.sh adb devices # any adb command, against port 5038
 dev/android.sh stop        # this emulator and its adb server only
 ```
 
+The APK asks for `INTERNET`, `ACCESS_NETWORK_STATE`, `ACCESS_WIFI_STATE`, `VIBRATE`, `WAKE_LOCK`, and `RECEIVE_BOOT_COMPLETED`. The last two came with the upload queue's background task: WorkManager holds the CPU awake while the task runs, and reschedules the task after a reboot. WorkManager also declares `FOREGROUND_SERVICE` for a foreground service the task never uses, so `app.config.ts` blocks that one. No camera, storage, or media permission.
+
 `dev/android.sh flow` signs in to the dev server on port 8010. It searches for "hydro", opens the September bill, adds " 2026" to its title, and saves. Then it marks the interest slip done in the inbox and taps Undo. It takes a screenshot at each step, then shows the key screens again in dark mode and at font scale 1.3. Before and after the light run, it puts the title and the inbox tag back through the API. It also adds the saved views Bills, School, and Tax if they are missing.
+
+`dev/android.sh upload` scans three documents, one of them with two pages, gives them the Bills tag, uploads them, and waits until the Uploads tab says Done for all three. Then it queues one more and kills the app while the send is still running, to see the job look for its upload instead of sending it twice. The emulator's network shaping leaves traffic to the host alone, so the flow signs in through `dev/slow-proxy.py`, which passes every request to the dev server and reads an upload body at 1 KB a second. Then it turns the network off, queues one more, kills the app, turns the network on, and runs the WorkManager job by hand, to see the document arrive with no screen open. After each part it asks the dev server how many documents named `<job id>.pdf` it holds. At the end it deletes every document the flow uploaded, so the seeded data stays as it was.
 
 `dev/android.sh scan` drives Google's scanner through the emulator's virtual camera. The emulator boots with `-camera-back virtualscene` and hangs the lease renewal fixture, `dev/fixtures/pdf/lease-renewal.png`, on the wall of the virtual room. The script turns the camera toward the poster or a blank wall through the emulator's gRPC `setPhysicalModel` call, so it needs `grpcurl`. Set `GRPCURL` to its path, here or in `.dev-data/toolchain.env`. The flow scans two pages as document one and one page as document two. It rotates a page, splits document one, sets the tag Bills for every document, and stops at the Upload button. Then it opens the saved batch again in dark mode and at font scale 1.3. Last, it shares a PDF into Waraq with `adb shell am start -a android.intent.action.SEND`.
 
@@ -158,6 +163,7 @@ stateDiagram-v2
     processing --> failed: taskFailed
     failed --> waiting: signedIn or retryRequested
     failed --> processing: signedIn or retryRequested, back to its check
+    failed --> preparing: retryRequested, after a failed PDF
     done --> [*]
 ```
 
@@ -170,6 +176,8 @@ Three rules keep two copies of a job from sending the same file:
 - `JobStore.saveIfUnchanged` writes only when the stored row still has the `updatedAt` the caller loaded, and returns whether it wrote. A row that is gone counts as changed, so a job the user deleted never comes back. A new job goes in through `insert`. `runStep` claims a job as `sending` with that check before it sends anything. A `runStep` that returns the job it was given either had nothing due or lost that claim. Reload the job before trying again. `deleteIfUnchanged` makes the same check, so a stale copy cannot delete a job that a runner has since claimed.
 - One drain runs at a time per JavaScript runtime.
 - `recoverAfterRestart` runs once when the process starts, before any drain. It never runs from a background entry point while the process is alive, because a job found in `sending` then is being sent, not left behind.
+
+Files move from the batch to the queue in two steps. Upload inserts one job per document, then clears the batch, which lives in another SQLite file. A batch found with jobs already made for some of its documents lost that second step, so those documents leave the batch when it is loaded and their files belong to their jobs. A document's page files stay on disk until its PDF exists, so a PDF that failed for want of space can be built again from them with Retry. They go when the PDF is built, when one of them turns out to be missing, or when the user deletes the job. The PDF, and a shared PDF's thumbnail, go when the job is done. A step that throws is reported, that job is left alone for the rest of the run, and the queue tries it again a minute later.
 
 One known gap remains. If the user retries a job that Paperless could not consume, and that retry's request never reaches the server, the lookup finds the earlier failed task with the same file name and shows that failure again. Nothing is uploaded twice. The user sees the old error and can retry once more.
 
