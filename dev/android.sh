@@ -8,9 +8,11 @@
 #   dev/android.sh shot <name>   save a screenshot as .dev-data/shots/<name>.png
 #   dev/android.sh flow          sign in, search, edit a title, and mark a document done, then the key screens in dark and large text
 #   dev/android.sh scan          scan two documents, rotate and split, set a shared tag, stop at Upload, then share a PDF in
+#   dev/android.sh upload        scan and upload three documents, then one killed mid-send, then one sent by the background task
 #   dev/android.sh pdf-check     run the PDF writer's checks on the emulator, then open its 10-page PDF on the Mac
 #   dev/android.sh logs          print the app's log lines
 #   dev/android.sh adb <args>    run adb against this project's own adb server
+#   dev/android.sh fn <name> ...  run one of this script's functions by hand, for example fn tap "Scan"
 #   dev/android.sh stop          stop this emulator and its adb server, and nothing else
 #
 # JAVA_HOME and ANDROID_HOME come from the environment or from .dev-data/toolchain.env.
@@ -52,6 +54,8 @@ LOGS=$DATA/logs
 SHOTS=$DATA/shots
 POSTER=$ROOT/dev/fixtures/pdf/lease-renewal.png
 GRPCURL=${GRPCURL:-grpcurl}
+# The address the flows type into the sign-in screen. The upload flow points it at its proxy.
+SIGN_IN_ADDRESS=http://10.0.2.2:8010
 
 mkdir -p "$DATA/home" "$DATA/tmp" "$ANDROID_USER_HOME" "$ANDROID_AVD_HOME" "$LOGS" "$SHOTS"
 # adb and the emulator read and write their keys under $HOME/.android, whatever ANDROID_USER_HOME says.
@@ -237,9 +241,9 @@ sign_in() {
   local run=$1 password=$2
   launch_signed_out
   shot "$run-1-address"
-  type_into "Server address" "http://10.0.2.2:8010"
+  type_into "Server address" "$SIGN_IN_ADDRESS"
   tap "Continue"
-  wait_for "Found Paperless-ngx 3.0 or newer at 10.0.2.2:8010" 20
+  wait_for "Found Paperless-ngx 3.0 or newer at ${SIGN_IN_ADDRESS#http://}" 20
   type_into "Username" admin
   type_into "Password" "$password"
   shot "$run-2-credentials"
@@ -449,7 +453,8 @@ face_blank_wall() {
 }
 
 # Google's scanner opens in auto capture and takes a page as soon as it sees one,
-# so it opens on a blank wall and takes each page by hand.
+# so it opens on a blank wall and takes each page by hand. Its labels have changed
+# between Play services releases, so each button is tried under both names.
 capture_pages() {
   local run=$1 count=$2 page
   wait_for "Capture" 240
@@ -459,7 +464,7 @@ capture_pages() {
   for page in $(seq 1 "$count"); do
     if [ "$page" -gt 1 ]; then
       face_blank_wall
-      tap "Add page."
+      tap "Add page." || tap "Add page. Button."
       wait_for "Capture" 30
       tap "Manual" || true
     fi
@@ -469,7 +474,7 @@ capture_pages() {
     wait_for "Page $page of $page. Selected." 30
   done
   shot "$run-scanner-pages"
-  tap "Next"
+  tap "Next" || tap "Done"
 }
 
 scan_batch() {
@@ -584,6 +589,261 @@ scan() {
   echo "scan flow passed, screenshots in $SHOTS"
 }
 
+
+# Documents the upload flow sends keep the app's default title, which the seed data never uses,
+# so the server can be asked for them by title and they can be removed again.
+UPLOAD_TITLE="Scanned document"
+DEV_SERVER=http://localhost:8010
+# The emulator's network shaping leaves traffic to the host alone, so the upload flow signs in through
+# dev/slow-proxy.py on this port, which reads any upload body over 8 KB at 1 KB a second. A scanned page
+# makes a PDF of about 25 KB, so each send runs for about half a minute.
+PROXY_PORT=8012
+PROXY_PID=""
+
+# Prints one line per document the flow uploaded: the id, a tab, and the original file name.
+uploaded_documents() {
+  python3 - "$DEV_SERVER" "$UPLOAD_TITLE" << 'EOF'
+import base64, json, sys, urllib.parse, urllib.request
+
+server, title = sys.argv[1], sys.argv[2]
+auth = base64.b64encode(b'admin:waraq-dev-password').decode()
+query = urllib.parse.urlencode({'title__iexact': title, 'fields': 'id,original_file_name', 'page_size': 100})
+request = urllib.request.Request(
+    f'{server}/api/documents/?{query}',
+    headers={'Authorization': f'Basic {auth}', 'Accept': 'application/json; version=10'},
+)
+with urllib.request.urlopen(request) as response:
+    for document in json.loads(response.read())['results']:
+        print(f"{document['id']}\t{document['original_file_name']}")
+EOF
+}
+
+# Fails unless the server holds exactly $1 uploaded documents, each under a different <job id>.pdf.
+expect_uploaded() {
+  local expected=$1 listing names
+  listing=$(uploaded_documents)
+  names=$(printf '%s\n' "$listing" | cut -f2 | sort)
+  echo "uploaded documents on the server:"
+  printf '%s\n' "$listing"
+  [ "$(printf '%s\n' "$names" | grep -cE '^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[0-9a-f]{4}-[0-9a-f]{12}\.pdf$')" = "$expected" ] || {
+    echo "expected $expected documents named <job id>.pdf" >&2
+    return 1
+  }
+  [ "$(printf '%s\n' "$names" | uniq -d | wc -l)" -eq 0 ] || {
+    echo "a document arrived more than once" >&2
+    return 1
+  }
+}
+
+wait_for_uploaded() {
+  local expected=$1 seconds=$2 attempt
+  for attempt in $(seq 1 "$seconds"); do
+    if [ "$(uploaded_documents | wc -l)" -ge "$expected" ]; then
+      return 0
+    fi
+    sleep 1
+  done
+  echo "the server did not get $expected documents within $seconds seconds" >&2
+  return 1
+}
+
+delete_uploaded() {
+  local id
+  for id in $(uploaded_documents | cut -f1); do
+    curl -sf -u admin:waraq-dev-password -X DELETE -H 'Accept: application/json; version=10' \
+      "$DEV_SERVER/api/documents/$id/" > /dev/null
+    echo "deleted document $id from the dev server"
+  done
+}
+
+count_nodes() {
+  adb shell uiautomator dump /sdcard/ui.xml > /dev/null 2>&1 || true
+  adb shell cat /sdcard/ui.xml | tr '>' '\n' | grep -c "text=\"$1\"" || true
+}
+
+wait_for_count() {
+  local label=$1 expected=$2 seconds=$3 attempt
+  for attempt in $(seq 1 "$seconds"); do
+    if [ "$(count_nodes "$label")" -ge "$expected" ]; then
+      return 0
+    fi
+    sleep 2
+  done
+  echo "gave up waiting for $expected rows saying \"$label\"" >&2
+  return 1
+}
+
+scan_document() {
+  local run=$1 pages=$2 button=$3
+  face_blank_wall
+  tap "$button"
+  capture_pages "$run" "$pages"
+}
+
+reset_network() {
+  adb shell cmd connectivity airplane-mode disable > /dev/null || true
+}
+
+start_proxy() {
+  python3 "$ROOT/dev/slow-proxy.py" "$PROXY_PORT" 8010 1000 8000 > "$LOGS/slow-proxy.log" 2>&1 &
+  PROXY_PID=$!
+  sleep 1
+}
+
+stop_proxy() {
+  if [ -n "$PROXY_PID" ]; then
+    kill "$PROXY_PID" 2> /dev/null || true
+  fi
+}
+
+# The tab's description carries the count of unfinished uploads, which changes as jobs move,
+# so the label is read from the screen just before the tap, and the tap is tried again if it moved.
+open_uploads_tab() {
+  local attempt label
+  for attempt in 1 2 3 4 5; do
+    adb shell uiautomator dump /sdcard/ui.xml > /dev/null 2>&1 || true
+    label=$(adb shell cat /sdcard/ui.xml | tr '>' '\n' | sed -nE 's/.*content-desc="(Uploads[^"]*)".*/\1/p' | head -1)
+    if tap_by_description "${label:-Uploads}" 2> /dev/null; then
+      wait_for "Uploads" 10
+      return 0
+    fi
+    sleep 1
+  done
+  echo "could not open the Uploads tab" >&2
+  return 1
+}
+
+upload_batch() {
+  local run=$1
+  scan_document "$run-1" 2 "Scan"
+  wait_for "Document 1" 30
+  scan_document "$run-2" 1 "Scan the next document"
+  wait_for "Document 2" 30
+  scan_document "$run-3" 1 "Scan the next document"
+  wait_for "Document 3" 30
+  sleep 1
+  shot "$run-4-batch"
+  tap "Review and upload 3 documents"
+  wait_for "For every document" 10
+  tap "Tags, Your server chooses"
+  wait_for "Bills" 10
+  tap "Bills"
+  tap "Done"
+  wait_for "Upload 3 documents" 10
+  sleep 1
+  shot "$run-5-details"
+  tap "Upload 3 documents"
+  wait_for "3 documents added to Uploads" 10
+  shot "$run-6-added"
+  open_uploads_tab
+  sleep 1
+  shot "$run-7-uploads-queued"
+  wait_for_count "Done" 3 300
+  sleep 1
+  shot "$run-8-uploads-done"
+  expect_uploaded 3
+}
+
+# Kills the app while the proxy is still reading the send, and starts it again.
+crash_mid_send() {
+  local run=$1
+  scan_document "$run-1" 1 "Scan"
+  wait_for "Document 1" 30
+  tap "Review and upload"
+  wait_for "Upload 1 document" 10
+  tap "Upload 1 document"
+  open_uploads_tab
+  wait_for "Sending" 60
+  sleep 2
+  shot "$run-2-sending"
+  adb shell am force-stop "$APP_ID"
+  adb shell monkey -p "$APP_ID" -c android.intent.category.LAUNCHER 1 > /dev/null 2>&1
+  wait_for "Scan" 30
+  open_uploads_tab
+  wait_for "Checking whether your server got it" 30
+  sleep 1
+  shot "$run-3-checking"
+  wait_for_count "Done" 4 400
+  sleep 1
+  shot "$run-4-done-after-crash"
+  expect_uploaded 4
+}
+
+# Queues a document with no network, kills the app, brings the network back, and runs the WorkManager
+# job by hand, so the upload happens with no screen of the app open. Android drops a force-stopped
+# app's scheduled jobs by design, so the app goes to the background and its process is killed instead.
+background_send() {
+  local run=$1 job
+  adb shell cmd connectivity airplane-mode enable > /dev/null
+  sleep 3
+  scan_document "$run-1" 1 "Scan"
+  wait_for "Document 1" 30
+  tap "Review and upload"
+  wait_for "Upload 1 document" 10
+  tap "Upload 1 document"
+  open_uploads_tab
+  wait_for "Waiting for a connection" 30
+  sleep 1
+  shot "$run-2-waiting-offline"
+
+  adb shell cmd uimode night yes > /dev/null
+  sleep 2
+  shot "$run-3-uploads-dark"
+  reset_display
+  # A font scale change restarts the activity on the Inbox tab.
+  adb shell settings put system font_scale 1.3
+  wait_for "Scan" 30
+  open_uploads_tab
+  sleep 1
+  shot "$run-4-uploads-large-text"
+  reset_display
+  wait_for "Scan" 30
+
+  adb shell input keyevent KEYCODE_HOME
+  sleep 2
+  adb shell am kill "$APP_ID"
+  sleep 2
+  [ -z "$(adb shell pidof "$APP_ID")" ] || {
+    echo "the app's process is still alive" >&2
+    return 1
+  }
+  adb shell cmd connectivity airplane-mode disable > /dev/null
+  sleep 5
+  # The first forced run only starts the process. WorkManager then puts its jobs back and drops the
+  # one that was running, so the jobs are run once more with the process alive.
+  for attempt in 1 2; do
+    for job in $(adb shell dumpsys jobscheduler | tr -d '\r' \
+        | sed -nE "s#.*JOB \#u0a[0-9]+/([0-9]+): [0-9a-f]+ $APP_ID/androidx.work.impl.background.systemjob.SystemJobService.*#\1#p" | sort -u); do
+      echo "running WorkManager job $job, run $attempt"
+      adb shell cmd jobscheduler run -f "$APP_ID" "$job"
+    done
+    sleep 8
+  done
+  wait_for_uploaded 5 300
+  adb shell dumpsys window | grep -E "mCurrentFocus|mFocusedApp" | grep -q "$APP_ID" && {
+    echo "the app opened a screen while the background task ran" >&2
+    return 1
+  }
+  echo "the background task sent the document with no screen open"
+  expect_uploaded 5
+}
+
+upload() {
+  trap 'reset_display; reset_network; stop_proxy' EXIT
+  reset_display
+  reset_network
+  start_proxy
+  SIGN_IN_ADDRESS=http://10.0.2.2:$PROXY_PORT
+  adb shell pm clear "$APP_ID" > /dev/null
+  delete_uploaded
+  see_inbox upload-signin
+  upload_batch upload-light
+  crash_mid_send upload-crash
+  background_send upload-background
+  delete_uploaded
+  echo "upload flow passed, screenshots in $SHOTS, the dev server holds its seeded data again"
+}
+
 pdf_check() {
   cd "$ROOT/android"
   ./gradlew :scanner:assembleDebugAndroidTest \
@@ -614,7 +874,7 @@ stop() {
 }
 
 case "${1:-}" in
-  build | badging | boot | install | flow | scan | logs | stop)
+  build | badging | boot | install | flow | scan | upload | logs | stop)
     "$1"
     ;;
   pdf-check)
@@ -623,6 +883,10 @@ case "${1:-}" in
   adb)
     shift
     adb_server "$@"
+    ;;
+  fn)
+    shift
+    "$@"
     ;;
   shot)
     shot "${2:?usage: $0 shot <name>}"
