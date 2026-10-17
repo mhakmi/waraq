@@ -22,7 +22,7 @@ import {
   TokenResponse,
   UiSettings,
 } from './schemas';
-import { Task, taskStatus, type TaskStatus } from './tasks';
+import { LenientTask, Task, taskStatus, type TaskStatus } from './tasks';
 import type { ServerUrl } from './url';
 
 export const apiVersion = 10;
@@ -424,7 +424,7 @@ export function createPaperlessClient<File>(options: ClientOptions<File>) {
     },
 
     async findConsumeTaskByFilename(filename: string, createdAfter: Date): Promise<Result<TaskId | null>> {
-      const result = await listAll(connection, 'tasks/', Task, {
+      const result = await listAll(connection, 'tasks/', LenientTask, {
         task_type: 'consume_file',
         date_created_after: createdAfter.toISOString(),
         ordering: '-date_created',
@@ -432,7 +432,7 @@ export function createPaperlessClient<File>(options: ClientOptions<File>) {
       if (!result.ok) {
         return result;
       }
-      const newest = result.value.find((task) => task.input_data.filename === filename);
+      const newest = result.value.find((task) => task !== null && task.input_data.filename === filename);
       return success(newest?.task_id ?? null);
     },
   };

@@ -42,6 +42,13 @@ describe('getTask with responses recorded from Paperless-ngx 3.3.2', () => {
     });
   });
 
+  test('a task row the client cannot read is an invalid response', async () => {
+    const oddRow = { ...pending.results[0], input_data: null };
+    const result = await clientAnswering({ ...pending, results: [oddRow] }).getTask(someTask);
+    expect(result.ok).toBe(false);
+    expect(!result.ok && result.error.kind).toBe('invalid_response');
+  });
+
   test('a task the server does not know is unknown', async () => {
     expect(await clientAnswering(missing).getTask(someTask)).toEqual({
       ok: true,
@@ -102,6 +109,17 @@ describe('findConsumeTaskByFilename', () => {
       value: pending.results[0].task_id,
     });
     expect(requests.map((url) => url.searchParams.get('page'))).toEqual(['1', '2']);
+  });
+
+  test('skips a row it cannot read instead of failing the lookup', async () => {
+    const filename = pending.results[0].input_data.filename;
+    const oddRow = { ...pending.results[0], task_id: 'odd-task', input_data: null };
+    const { paging } = clientPaging([{ ...pending, results: [oddRow, pending.results[0]] }]);
+
+    expect(await paging.findConsumeTaskByFilename(filename, createdAfter)).toEqual({
+      ok: true,
+      value: pending.results[0].task_id,
+    });
   });
 
   test('returns null when no task has that file name', async () => {

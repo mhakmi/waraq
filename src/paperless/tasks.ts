@@ -24,6 +24,11 @@ export const Task = z.object({
 });
 type Task = z.infer<typeof Task>;
 
+export const LenientTask = z.unknown().transform((row) => {
+  const parsed = Task.safeParse(row);
+  return parsed.success ? parsed.data : null;
+});
+
 function failureMessage(task: Task): string {
   const result = task.result_data;
   if (result?.error_message) {
