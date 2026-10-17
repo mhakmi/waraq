@@ -11,7 +11,7 @@ import { describeError, failure, type Result, success } from '../paperless/error
 import type { Batch } from '../scan/batch';
 import { createUploadQueue, type Progress, type QueueSnapshot } from './drain';
 import { expoDatabase } from './expoDatabase';
-import type { AccountId, UploadJob } from './machine';
+import type { AccountId, JobId, UploadJob } from './machine';
 import type { JobStore, PdfBuildFailure } from './runner';
 import { openJobStore } from './store';
 import { xhrFetch } from './xhrFetch';
@@ -79,7 +79,7 @@ async function clientFor(accountId: AccountId, onProgress: (progress: Progress) 
   });
 }
 
-// A URI that is not a file, or a file the app may not read, counts as missing. File throws on both.
+// File throws on a URI that is not a file path. Such a page or PDF counts as missing.
 function fileExists(uri: string): boolean {
   try {
     return new File(uri).exists;
@@ -161,6 +161,15 @@ export function runUploads(): Promise<void> {
 
 export function enqueueBatch(batch: Batch): Promise<void> {
   return uploadQueue.enqueue(batch);
+}
+
+export async function queuedJobIds(): Promise<ReadonlySet<JobId> | null> {
+  try {
+    return new Set((await store.loadAll()).map((job) => job.id));
+  } catch (error) {
+    reportUploadError(error);
+    return null;
+  }
 }
 
 export function connectUploadsToDevice(): () => void {

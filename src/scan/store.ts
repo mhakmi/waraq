@@ -5,6 +5,7 @@ import { useSyncExternalStore } from 'react';
 import type { ImportedFile, ScannedImage } from '../../modules/scanner';
 import type { AccountId } from '../account/id';
 import { BatchId, JobId } from '../upload/machine';
+import { queuedJobIds } from '../upload/queue';
 import { uuidV7 } from '../upload/uuid';
 import {
   addDocument,
@@ -15,6 +16,7 @@ import {
   newBatch,
   PageId,
   type ScannedPage,
+  withoutQueuedDocuments,
 } from './batch';
 import { parseStoredBatch } from './stored';
 
@@ -96,6 +98,14 @@ export function useBatch(): Snapshot {
   return useSyncExternalStore(subscribe, () => snapshot);
 }
 
+async function writeStored(batch: Batch | null): Promise<void> {
+  if (batch === null) {
+    await Storage.removeItem(storageKey);
+  } else {
+    await Storage.setItem(storageKey, JSON.stringify(batch));
+  }
+}
+
 async function readStoredBatch(accountId: AccountId): Promise<Batch | null> {
   const text = await Storage.getItem(storageKey);
   const stored = parseStoredBatch(text);
@@ -104,12 +114,34 @@ async function readStoredBatch(accountId: AccountId): Promise<Batch | null> {
     await Storage.removeItem(storageKey);
     return null;
   }
-  if (stored !== null && stored.accountId !== accountId) {
+  const queued = stored === null ? null : await queuedJobIds();
+  const batch = stored === null || queued === null ? stored : withoutQueuedDocuments(stored, queued);
+  if (batch !== stored) {
+    await writeStored(batch);
+  }
+  if (batch !== null && batch.accountId !== accountId) {
     await Storage.removeItem(storageKey);
-    deleteFiles(batchFiles(stored));
+    if (queued !== null) {
+      deleteFiles(batchFiles(batch));
+    }
     return null;
   }
-  return stored;
+  return batch;
+}
+
+// After an upload that failed partway, the documents that did get jobs leave the batch,
+// so a later discard or edit cannot delete files those jobs need.
+export async function dropQueuedDocuments(): Promise<void> {
+  const before = snapshot.batch;
+  const queued = before === null ? null : await queuedJobIds();
+  if (before === null || queued === null) {
+    return;
+  }
+  const after = withoutQueuedDocuments(before, queued);
+  if (after !== before) {
+    publish({ loaded: true, batch: after });
+    save(after, []);
+  }
 }
 
 export function loadBatch(accountId: AccountId): Promise<Batch | null> {
@@ -131,8 +163,12 @@ export function loadBatch(accountId: AccountId): Promise<Batch | null> {
 export async function forgetBatch(): Promise<void> {
   await writes;
   const stored = parseStoredBatch(await Storage.getItem(storageKey));
+  const queued = stored === null ? null : await queuedJobIds();
   await Storage.removeItem(storageKey);
-  deleteFiles(batchFiles(stored));
+  // Unknown jobs delete nothing: queuing a document twice is harmless, deleting a job's page files is not.
+  if (stored !== null && queued !== null) {
+    deleteFiles(batchFiles(withoutQueuedDocuments(stored, queued)));
+  }
   loadedFor = null;
   loading = null;
   publish({ loaded: false, batch: null });
@@ -150,11 +186,7 @@ function deleteFiles(uris: string[]) {
 function save(batch: Batch | null, filesToDelete: string[]) {
   writes = writes
     .then(async () => {
-      if (batch === null) {
-        await Storage.removeItem(storageKey);
-      } else {
-        await Storage.setItem(storageKey, JSON.stringify(batch));
-      }
+      await writeStored(batch);
       deleteFiles(filesToDelete);
     })
     .catch(() => {});

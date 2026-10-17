@@ -108,6 +108,15 @@ export function filesLeftBehind(before: Batch | null, after: Batch | null): stri
   return batchFiles(before).filter((uri) => !kept.has(uri));
 }
 
+// Upload makes the jobs, then clears the batch. A batch with jobs for some of its documents lost that second step.
+export function withoutQueuedDocuments(batch: Batch, queued: ReadonlySet<JobId>): Batch | null {
+  const documents = batch.documents.filter((document) => !queued.has(document.id));
+  if (documents.length === batch.documents.length) {
+    return batch;
+  }
+  return documents.length === 0 ? null : { ...batch, documents };
+}
+
 export function newBatch(id: BatchId, accountId: AccountId, now: number): Batch {
   return { id, accountId, createdAt: now, shared: {}, documents: [] };
 }

@@ -25,6 +25,7 @@ import {
   setOwn,
   setShared,
   splitDocument,
+  withoutQueuedDocuments,
 } from './batch';
 
 function jobId(number: number): JobId {
@@ -279,4 +280,24 @@ describe('filesLeftBehind', () => {
   test('a discarded batch leaves every file', () => {
     expect(filesLeftBehind(start, null)).toHaveLength(4);
   });
+});
+
+describe('withoutQueuedDocuments', () => {
+  const start = batchOf(pagesDocument(1, ['a', 'b']), sharedPdf);
+
+  test('a document that already has a job leaves the batch, and discarding the rest leaves its files alone', () => {
+    const left = withoutQueuedDocuments(start, new Set([jobId(1)]));
+
+    expect(left?.documents.map((document) => document.id)).toEqual([sharedPdf.id]);
+    expect(filesLeftBehind(left, null)).toEqual(['file:///batch/lease.pdf', 'file:///batch/lease.jpg']);
+  });
+
+  test('a batch whose every document has a job is gone', () => {
+    expect(withoutQueuedDocuments(start, new Set([jobId(1), sharedPdf.id]))).toBeNull();
+  });
+
+  test('a batch with no job yet is the same batch', () => {
+    expect(withoutQueuedDocuments(start, new Set([jobId(7)]))).toBe(start);
+  });
+
 });

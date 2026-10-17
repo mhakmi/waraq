@@ -6,7 +6,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { copy } from '../../src/copy';
 import { type Named, nameOf, useCreateLabel, useLabels } from '../../src/labels';
 import { type Batch, type DocumentMetadata, type DraftDocument, pageCount, setOwn, setShared } from '../../src/scan/batch';
-import { batchQueued, updateBatch, useBatch } from '../../src/scan/store';
+import { batchQueued, dropQueuedDocuments, updateBatch, useBatch } from '../../src/scan/store';
 import { useSignedIn } from '../../src/session';
 import { radius, touchTarget, useColors } from '../../src/theme';
 import { Button } from '../../src/ui/Button';
@@ -103,6 +103,7 @@ export default function BatchDetailsScreen() {
       batchQueued();
       router.dismissAll();
     } catch {
+      await dropQueuedDocuments();
       uploadStarted.current = false;
       setUploadFailed(true);
       setUploading(false);
