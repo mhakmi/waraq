@@ -46,7 +46,9 @@ export function Button({ label, onPress, variant = 'primary', large = false, ico
       ]}
     >
       {busy ? <ActivityIndicator color={look.text} /> : icon && <Icon name={icon} color={look.text} size={18} />}
-      <Text style={[styles.label, large && styles.largeLabel, { color: look.text }]}>{label}</Text>
+      <Text style={[styles.label, large && styles.largeLabel, variant === 'text' && styles.link, { color: look.text }]}>
+        {label}
+      </Text>
     </Pressable>
   );
 }
@@ -65,4 +67,5 @@ const styles = StyleSheet.create({
   large: { minHeight: 56 },
   label: { fontSize: 15, fontWeight: '500', textAlign: 'center', flexShrink: 1 },
   largeLabel: { fontSize: 16 },
+  link: { textDecorationLine: 'underline' },
 });
