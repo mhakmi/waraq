@@ -14,6 +14,7 @@ import {
   pollDelay,
   sendRetryDelay,
   sentGraceWindow,
+  stepIsDue,
   transition,
   type UploadEvent,
   type UploadJob,
@@ -257,6 +258,24 @@ describe('nextStep', () => {
     ['failedRejected', { effect: 'none' }],
   ])('%s', (stateName, expected) => {
     expect(nextStep(jobIn(states[stateName]))).toEqual(expected);
+  });
+});
+
+describe('stepIsDue', () => {
+  const minute = 60_000;
+
+  test.each<[string, ReturnType<typeof nextStep>, boolean]>([
+    ['a send whose time has come', { effect: 'send', at: now }, true],
+    ['a send due in a minute', { effect: 'send', at: now + minute }, false],
+    ['a send due in exactly the longest retry', { effect: 'send', at: now + 30 * minute }, false],
+    ['a send further ahead than any retry', { effect: 'send', at: now + 30 * minute + 1 }, true],
+    ['a lookup further ahead than any retry', { effect: 'reconcile', at: now + 30 * minute + 1 }, true],
+    ['a check due in a minute', { effect: 'check', taskId, at: now + minute }, false],
+    ['a check further ahead than any poll', { effect: 'check', taskId, at: now + minute + 1 }, true],
+    ['a prepare queued in the future', { effect: 'prepare', at: now + 1 }, true],
+    ['nothing to do', { effect: 'none' }, false],
+  ])('%s', (_name, step, due) => {
+    expect(stepIsDue(step, now)).toBe(due);
   });
 });
 

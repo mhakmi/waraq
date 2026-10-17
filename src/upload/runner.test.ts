@@ -175,6 +175,15 @@ describe('runStep', () => {
     expect(next.state).toMatchObject({ kind: 'processing', taskId });
   });
 
+  test('a send pushed further ahead than any retry by a clock set back runs now', async () => {
+    const store = new MemoryJobStore();
+    const job = jobIn({ kind: 'waiting', attempt: 0, notBefore: now + 31 * 60_000, maybeSent: false }, '/gone.pdf');
+
+    const next = await runStep(job, depsAt(now, store));
+
+    expect(next.state).toEqual({ kind: 'failed', reason: { kind: 'file_missing' } });
+  });
+
   test('a step that is not due yet changes nothing', async () => {
     const store = new MemoryJobStore();
     const job = jobIn({ kind: 'waiting', attempt: 1, notBefore: 5000, maybeSent: false }, '/file.pdf');

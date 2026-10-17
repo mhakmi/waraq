@@ -100,12 +100,15 @@ const graceRecheckDelay = 30 * second;
 // After this many checks in a row with no answer about the task, reconcile decides what happened to it.
 export const failedCheckLimit = 10;
 
+const longestSendRetry = 30 * minute;
+const longestPoll = minute;
+
 export function sendRetryDelay(attempt: number): number {
-  return Math.min(30 * minute, 5 * second * 2 ** attempt);
+  return Math.min(longestSendRetry, 5 * second * 2 ** attempt);
 }
 
 export function pollDelay(checks: number): number {
-  return Math.min(minute, 2 * second * 2 ** checks);
+  return Math.min(longestPoll, 2 * second * 2 ** checks);
 }
 
 export function uploadFilename(id: JobId): string {
@@ -285,6 +288,21 @@ export function nextStep(job: UploadJob): NextStep {
     case 'failed':
       return { effect: 'none' };
   }
+}
+
+const longestWait = {
+  prepare: 0,
+  send: longestSendRetry,
+  reconcile: Math.max(longestSendRetry, graceRecheckDelay),
+  check: longestPoll,
+};
+
+export function stepIsDue(step: NextStep, now: number): step is Exclude<NextStep, { effect: 'none' }> {
+  if (step.effect === 'none') {
+    return false;
+  }
+  // Only a clock set back can leave the step further ahead than any delay the machine hands out.
+  return step.at <= now || step.at - now > longestWait[step.effect];
 }
 
 export function canDelete(state: UploadState): boolean {

@@ -5,6 +5,7 @@ import {
   canDelete,
   type JobId,
   nextStep,
+  stepIsDue,
   transition,
   type UploadEvent,
   type UploadJob,
@@ -114,7 +115,7 @@ async function check<File>(taskId: TaskId, client: UploadClient<File>): Promise<
 export async function runStep<File>(job: UploadJob, deps: RunnerDeps<File>): Promise<UploadJob> {
   const now = deps.now();
   const step = nextStep(job);
-  if (step.effect === 'none' || step.at > now) {
+  if (!stepIsDue(step, now)) {
     return job;
   }
 
