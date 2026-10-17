@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-import { errorForStatus, failure, type PaperlessError, type Result, success } from './errors';
+import { describeError, errorForStatus, failure, type PaperlessError, type Result, success } from './errors';
 import {
   Correspondent,
   CustomField,
@@ -35,10 +35,24 @@ export type Auth = { kind: 'token'; token: string };
 
 export type FileAppender<File> = (form: FormData, field: string, file: File, filename: string) => void;
 
+export type HttpResponse = {
+  status: number;
+  url: string;
+  redirected: boolean;
+  headers: { get(name: string): string | null };
+  text(): Promise<string>;
+};
+
+export type Fetch = (
+  url: string,
+  init: { method: string; headers: Record<string, string>; body?: string | FormData; signal: AbortSignal },
+) => Promise<HttpResponse>;
+
 export type ClientOptions<File> = {
   baseUrl: ServerUrl;
   auth: Auth;
-  fetch: typeof fetch;
+  extraHeaders?: Record<string, string>;
+  fetch: Fetch;
   appendFile: FileAppender<File>;
 };
 
@@ -101,7 +115,7 @@ type QueryValue = string | number | boolean | undefined;
 
 type Connection = {
   baseUrl: ServerUrl;
-  fetch: typeof fetch;
+  fetch: Fetch;
   headers: Record<string, string>;
 };
 
@@ -127,7 +141,7 @@ async function send(
   connection: Connection,
   path: string,
   options: RequestOptions = {},
-): Promise<Result<{ headers: Headers; body: unknown }>> {
+): Promise<Result<{ headers: HttpResponse['headers']; body: unknown }>> {
   const headers: Record<string, string> = {
     Accept: `application/json; version=${apiVersion}`,
     ...connection.headers,
@@ -144,7 +158,7 @@ async function send(
   }, options.timeoutMs ?? requestTimeoutMs);
 
   let status: number;
-  let responseHeaders: Headers;
+  let responseHeaders: HttpResponse['headers'];
   let text: string;
   try {
     const response = await connection.fetch(urlFor(connection.baseUrl, path, options.query), {
@@ -160,7 +174,7 @@ async function send(
     if (timedOut) {
       return failure({ kind: 'timeout' });
     }
-    return failure({ kind: 'network', message: error instanceof Error ? error.message : String(error) });
+    return failure({ kind: 'network', message: describeError(error) });
   } finally {
     clearTimeout(timer);
   }
@@ -308,10 +322,10 @@ function tokenErrorFromBody(body: string): TokenError | null {
 }
 
 export async function obtainToken(
-  server: { baseUrl: ServerUrl; fetch: typeof fetch },
+  server: { baseUrl: ServerUrl; fetch: Fetch; extraHeaders?: Record<string, string> },
   credentials: { username: string; password: string; code?: string },
 ): Promise<Result<string, TokenError>> {
-  const connection = { baseUrl: server.baseUrl, fetch: server.fetch, headers: {} };
+  const connection = { baseUrl: server.baseUrl, fetch: server.fetch, headers: { ...server.extraHeaders } };
   const result = await requestJson(connection, 'token/', TokenResponse, {
     method: 'POST',
     body: JSON.stringify(credentials),
@@ -327,7 +341,7 @@ export function createPaperlessClient<File>(options: ClientOptions<File>) {
   const connection: Connection = {
     baseUrl: options.baseUrl,
     fetch: options.fetch,
-    headers: authHeaders(options.auth),
+    headers: { ...options.extraHeaders, ...authHeaders(options.auth) },
   };
 
   return {

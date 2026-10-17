@@ -39,3 +39,16 @@ export function errorForStatus(status: number, body: string): PaperlessError {
   }
   return { kind: 'rejected', status, body };
 }
+
+// Node's fetch puts the reason in the cause, for example ECONNREFUSED. OkHttp's message already holds it.
+export function describeError(error: unknown): string {
+  if (!(error instanceof Error)) {
+    return String(error);
+  }
+  const cause = error.cause;
+  if (!(cause instanceof Error)) {
+    return error.message;
+  }
+  const code = 'code' in cause && typeof cause.code === 'string' ? cause.code : '';
+  return [error.message, cause.message, code].join(' ').trim();
+}

@@ -2,26 +2,8 @@ import * as SecureStore from 'expo-secure-store';
 import Storage from 'expo-sqlite/kv-store';
 import { z } from 'zod';
 
-import { normalizeServerUrl, type ServerUrl } from '../paperless/url';
-
-export type AccountId = string & { readonly __brand: 'AccountId' };
-
-export type ServerAccount = {
-  id: AccountId;
-  serverUrl: ServerUrl;
-  username: string;
-  serverVersion: string;
-  apiVersion: number;
-  extraHeaders: string[];
-  addedAt: number;
-};
-
-export type AccountSecrets = {
-  token: string;
-  headerValues: Record<string, string>;
-};
-
-export type StoredAccount = { account: ServerAccount; secrets: AccountSecrets };
+import { normalizeServerUrl } from '../paperless/url';
+import type { AccountId, ServerAccount, StoredAccount } from './types';
 
 const accountKey = 'account';
 

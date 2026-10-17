@@ -1,6 +1,7 @@
 import { createContext, type ReactNode, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 
-import { clearAccount, loadAccount, saveAccount, type StoredAccount } from './account/store';
+import { clearAccount, loadAccount, saveAccount } from './account/store';
+import type { StoredAccount } from './account/types';
 import { queryClient } from './query';
 
 export type SessionState =
@@ -61,3 +62,4 @@ export function useSignedIn(): StoredAccount {
   }
   return state.stored;
 }
+

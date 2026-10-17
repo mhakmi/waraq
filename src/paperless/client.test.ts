@@ -81,3 +81,43 @@ describe('notes', () => {
     });
   });
 });
+
+describe('extra headers', () => {
+  const extraHeaders = { 'CF-Access-Client-Id': 'id', Authorization: 'Basic proxy' };
+
+  test('go on every request and on file requests, and never replace the token', async () => {
+    const sent: Record<string, string>[] = [];
+    const client = createPaperlessClient({
+      baseUrl,
+      auth: { kind: 'token', token: 'token' },
+      extraHeaders,
+      fetch: async (_, init) => {
+        sent.push(init.headers);
+        return new Response(JSON.stringify({ count: 0, next: null, results: [] }), { status: 200 });
+      },
+      appendFile: () => {},
+    });
+    await client.listDocuments();
+    const file = client.documentFile(1 as DocumentId, 'thumb');
+    for (const headers of [sent[0], file.headers]) {
+      expect(headers['CF-Access-Client-Id']).toBe('id');
+      expect(headers.Authorization).toBe('Token token');
+    }
+  });
+
+  test('go on the token request', async () => {
+    const sent: Record<string, string>[] = [];
+    await obtainToken(
+      {
+        baseUrl,
+        extraHeaders,
+        fetch: async (_, init) => {
+          sent.push(init.headers);
+          return new Response(JSON.stringify({ token: 'new' }), { status: 200 });
+        },
+      },
+      { username: 'someone', password: 'secret' },
+    );
+    expect(sent[0]['CF-Access-Client-Id']).toBe('id');
+  });
+});
