@@ -52,12 +52,12 @@ function advance(job: UploadJob, event: UploadEvent, now: number): UploadJob {
   return { ...job, state: transition(job.state, event, now), updatedAt: now };
 }
 
-async function prepare<File>(job: UploadJob, deps: RunnerDeps<File>): Promise<UploadJob> {
+async function prepare<File>(job: UploadJob, deps: RunnerDeps<File>, now: number): Promise<UploadJob> {
   const built = await deps.buildPdf(job);
   if (!built.ok) {
-    return advance(job, { kind: 'prepareFailed', message: built.error }, deps.now());
+    return advance(job, { kind: 'prepareFailed', message: built.error }, now);
   }
-  return advance({ ...job, pdfPath: built.value }, { kind: 'prepared' }, deps.now());
+  return advance({ ...job, pdfPath: built.value }, { kind: 'prepared' }, now);
 }
 
 async function reconcile<File>(job: UploadJob, client: UploadClient<File>): Promise<UploadEvent> {
@@ -79,12 +79,12 @@ async function reconcile<File>(job: UploadJob, client: UploadClient<File>): Prom
   return { kind: 'notFound' };
 }
 
-async function send<File>(job: UploadJob, deps: RunnerDeps<File>): Promise<UploadJob> {
+async function send<File>(job: UploadJob, deps: RunnerDeps<File>, now: number): Promise<UploadJob> {
   const file = job.pdfPath === null ? null : await deps.readFile(job.pdfPath);
   if (file === null) {
-    return advance(job, { kind: 'fileMissing' }, deps.now());
+    return advance(job, { kind: 'fileMissing' }, now);
   }
-  const sending = advance(job, { kind: 'sendStarted' }, deps.now());
+  const sending = advance(job, { kind: 'sendStarted' }, now);
   await deps.store.save(sending);
   const posted = await deps.client.postDocument(job.fields, file, uploadFilename(job.id));
   const event: UploadEvent = posted.ok
@@ -112,24 +112,25 @@ async function check<File>(taskId: TaskId, client: UploadClient<File>): Promise<
 }
 
 export async function runStep<File>(job: UploadJob, deps: RunnerDeps<File>): Promise<UploadJob> {
+  const now = deps.now();
   const step = nextStep(job);
-  if (step.effect === 'none' || step.at > deps.now()) {
+  if (step.effect === 'none' || step.at > now) {
     return job;
   }
 
   let next: UploadJob;
   switch (step.effect) {
     case 'prepare':
-      next = await prepare(job, deps);
+      next = await prepare(job, deps, now);
       break;
     case 'reconcile':
-      next = advance(job, await reconcile(job, deps.client), deps.now());
+      next = advance(job, await reconcile(job, deps.client), now);
       break;
     case 'send':
-      next = await send(job, deps);
+      next = await send(job, deps, now);
       break;
     case 'check':
-      next = advance(job, await check(step.taskId, deps.client), deps.now());
+      next = advance(job, await check(step.taskId, deps.client), now);
       break;
   }
   await deps.store.save(next);

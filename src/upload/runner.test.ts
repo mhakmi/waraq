@@ -160,6 +160,21 @@ describe('runStep', () => {
     expect(await store.loadAll()).toEqual([next]);
   });
 
+  test('a clock that steps back between two reads cannot refuse a send that was due', async () => {
+    const store = new MemoryJobStore();
+    const job = jobIn({ kind: 'waiting', attempt: 0, notBefore: 1000, maybeSent: false }, '/file.pdf');
+    const clock = [1000, 900];
+    const deps: RunnerDeps<string> = {
+      ...depsAt(0, store, { ...offlineClient, postDocument: async () => success(taskId) }),
+      now: () => clock.shift() ?? 900,
+      readFile: async () => 'pdf bytes',
+    };
+
+    const next = await runStep(job, deps);
+
+    expect(next.state).toMatchObject({ kind: 'processing', taskId });
+  });
+
   test('a step that is not due yet changes nothing', async () => {
     const store = new MemoryJobStore();
     const job = jobIn({ kind: 'waiting', attempt: 1, notBefore: 5000, maybeSent: false }, '/file.pdf');
