@@ -35,6 +35,12 @@ stateDiagram-v2
 
 The file goes up as `<job id>.pdf`. Paperless-ngx accepts the same file twice, so the app never sends a file again just because it is unsure. If a send may have reached the server, for example after a timeout or an app crash, the job looks for a task or a document with that file name first. It sends again only when neither exists.
 
+Three rules keep two copies of a job from sending the same file:
+
+- `JobStore.saveIfUnchanged` writes only when the stored row still has the `updatedAt` the caller loaded, and returns whether it wrote. `runStep` claims a job as `sending` with that check before it sends anything. A `runStep` that returns the job it was given either had nothing due or lost that claim. Reload the job before trying again.
+- One drain runs at a time per JavaScript runtime.
+- `recoverAfterRestart` runs once when the process starts, before any drain. It never runs from a background entry point while the process is alive, because a job found in `sending` then is being sent, not left behind.
+
 ## Run the tests
 
 You need Bun and Docker.

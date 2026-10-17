@@ -149,7 +149,41 @@ describe('check', () => {
   });
 });
 
+describe('MemoryJobStore', () => {
+  test('refuses a write from a copy that is no longer the stored one', async () => {
+    const store = new MemoryJobStore();
+    const job = jobIn({ kind: 'preparing' }, null);
+    const moved = { ...job, updatedAt: job.updatedAt + 1 };
+
+    expect(await store.saveIfUnchanged(job, job.updatedAt)).toBe(true);
+    expect(await store.saveIfUnchanged(moved, job.updatedAt)).toBe(true);
+    expect(await store.saveIfUnchanged({ ...job, pageCount: 2 }, job.updatedAt)).toBe(false);
+    expect(await store.loadAll()).toEqual([moved]);
+  });
+});
+
 describe('runStep', () => {
+  test('two runners that loaded the same job send it once', async () => {
+    const store = new MemoryJobStore();
+    const job = jobIn({ kind: 'waiting', attempt: 0, notBefore: 0, maybeSent: false }, '/file.pdf');
+    let posts = 0;
+    const counting: UploadClient<string> = {
+      ...offlineClient,
+      postDocument: async () => {
+        posts += 1;
+        return success(taskId);
+      },
+    };
+    const deps = { ...depsAt(job.updatedAt, store, counting), readFile: async () => 'pdf bytes' };
+
+    const results = await Promise.all([runStep(job, deps), runStep(job, deps)]);
+
+    expect(posts).toBe(1);
+    expect(results.map((result) => result.state.kind).sort()).toEqual(['processing', 'waiting']);
+    expect(await store.loadAll()).toEqual(results.filter((result) => result.state.kind === 'processing'));
+  });
+
+
   test('a PDF that is gone from disk fails the job without calling the server', async () => {
     const store = new MemoryJobStore();
     const job = jobIn({ kind: 'waiting', attempt: 0, notBefore: 0, maybeSent: false }, '/gone.pdf');
@@ -197,7 +231,7 @@ describe('deleteJob', () => {
   test('refuses a job that is being sent and keeps it stored', async () => {
     const store = new MemoryJobStore();
     const job = jobIn({ kind: 'sending', attempt: 0, startedAt: 0 }, '/file.pdf');
-    await store.save(job);
+    await store.saveIfUnchanged(job, job.updatedAt);
 
     expect(await deleteJob(job, store)).toBe(false);
     expect(await store.loadAll()).toEqual([job]);
@@ -206,7 +240,7 @@ describe('deleteJob', () => {
   test('removes a finished job', async () => {
     const store = new MemoryJobStore();
     const job = jobIn({ kind: 'failed', reason: { kind: 'file_missing' } }, null);
-    await store.save(job);
+    await store.saveIfUnchanged(job, job.updatedAt);
 
     expect(await deleteJob(job, store)).toBe(true);
     expect(await store.loadAll()).toEqual([]);

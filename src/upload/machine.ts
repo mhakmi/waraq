@@ -94,10 +94,9 @@ type EventOf<Kind extends EventKind> = Extract<UploadEvent, { kind: Kind }>;
 const second = 1000;
 const minute = 60 * second;
 
-// After a send that got no reply, the server may still be working on the request for this long.
+// A proxy can hand the body on after the phone gave up, so a send that got no reply may still land.
 export const sentGraceWindow = 2 * minute;
 const graceRecheckDelay = 30 * second;
-// After this many checks in a row with no answer about the task, reconcile decides what happened to it.
 export const failedCheckLimit = 10;
 
 const longestSendRetry = 30 * minute;
@@ -301,8 +300,8 @@ export function stepIsDue(step: NextStep, now: number): step is Exclude<NextStep
   if (step.effect === 'none') {
     return false;
   }
-  // Only a clock set back can leave the step further ahead than any delay the machine hands out.
-  return step.at <= now || step.at - now > longestWait[step.effect];
+  const clockSetBack = step.at - now > longestWait[step.effect];
+  return step.at <= now || clockSetBack;
 }
 
 export function canDelete(state: UploadState): boolean {

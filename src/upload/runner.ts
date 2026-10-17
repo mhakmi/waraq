@@ -14,7 +14,7 @@ import {
 
 export interface JobStore {
   loadAll(): Promise<UploadJob[]>;
-  save(job: UploadJob): Promise<void>;
+  saveIfUnchanged(job: UploadJob, loadedUpdatedAt: number): Promise<boolean>;
   delete(id: JobId): Promise<void>;
 }
 
@@ -25,8 +25,13 @@ export class MemoryJobStore implements JobStore {
     return Array.from(this.jobs.values(), (job) => structuredClone(job));
   }
 
-  async save(job: UploadJob): Promise<void> {
+  async saveIfUnchanged(job: UploadJob, loadedUpdatedAt: number): Promise<boolean> {
+    const stored = this.jobs.get(job.id);
+    if (stored !== undefined && stored.updatedAt !== loadedUpdatedAt) {
+      return false;
+    }
     this.jobs.set(job.id, structuredClone(job));
+    return true;
   }
 
   async delete(id: JobId): Promise<void> {
@@ -50,7 +55,12 @@ export type RunnerDeps<File> = {
 };
 
 function advance(job: UploadJob, event: UploadEvent, now: number): UploadJob {
-  return { ...job, state: transition(job.state, event, now), updatedAt: now };
+  // The store compares updatedAt to spot a stale writer, so each write must change it even within one millisecond.
+  return { ...job, state: transition(job.state, event, now), updatedAt: Math.max(now, job.updatedAt + 1) };
+}
+
+async function saveOrKeep(store: JobStore, loaded: UploadJob, next: UploadJob): Promise<UploadJob> {
+  return (await store.saveIfUnchanged(next, loaded.updatedAt)) ? next : loaded;
 }
 
 async function prepare<File>(job: UploadJob, deps: RunnerDeps<File>, now: number): Promise<UploadJob> {
@@ -83,15 +93,18 @@ async function reconcile<File>(job: UploadJob, client: UploadClient<File>): Prom
 async function send<File>(job: UploadJob, deps: RunnerDeps<File>, now: number): Promise<UploadJob> {
   const file = job.pdfPath === null ? null : await deps.readFile(job.pdfPath);
   if (file === null) {
-    return advance(job, { kind: 'fileMissing' }, now);
+    return saveOrKeep(deps.store, job, advance(job, { kind: 'fileMissing' }, now));
   }
   const sending = advance(job, { kind: 'sendStarted' }, now);
-  await deps.store.save(sending);
+  const claimed = await deps.store.saveIfUnchanged(sending, job.updatedAt);
+  if (!claimed) {
+    return job;
+  }
   const posted = await deps.client.postDocument(job.fields, file, uploadFilename(job.id));
   const event: UploadEvent = posted.ok
     ? { kind: 'sendAccepted', taskId: posted.value }
     : { kind: 'sendFailed', error: posted.error };
-  return advance(sending, event, deps.now());
+  return saveOrKeep(deps.store, sending, advance(sending, event, deps.now()));
 }
 
 async function check<File>(taskId: TaskId, client: UploadClient<File>): Promise<UploadEvent> {
@@ -119,23 +132,16 @@ export async function runStep<File>(job: UploadJob, deps: RunnerDeps<File>): Pro
     return job;
   }
 
-  let next: UploadJob;
   switch (step.effect) {
     case 'prepare':
-      next = await prepare(job, deps, now);
-      break;
+      return saveOrKeep(deps.store, job, await prepare(job, deps, now));
     case 'reconcile':
-      next = advance(job, await reconcile(job, deps.client), now);
-      break;
+      return saveOrKeep(deps.store, job, advance(job, await reconcile(job, deps.client), now));
     case 'send':
-      next = await send(job, deps, now);
-      break;
+      return send(job, deps, now);
     case 'check':
-      next = advance(job, await check(step.taskId, deps.client), now);
-      break;
+      return saveOrKeep(deps.store, job, advance(job, await check(step.taskId, deps.client), now));
   }
-  await deps.store.save(next);
-  return next;
 }
 
 export function recoverAfterRestart(job: UploadJob, now: number): UploadJob {
