@@ -22,13 +22,14 @@ import {
   TokenResponse,
   UiSettings,
 } from './schemas';
+import { Task, taskStatus, type TaskStatus } from './tasks';
 import type { ServerUrl } from './url';
 
 export const apiVersion = 10;
 
 const requestTimeoutMs = 30_000;
 const uploadTimeoutMs = 10 * 60_000;
-const labelPageSize = 1000;
+const listPageSize = 1000;
 
 export type Auth = { kind: 'token'; token: string };
 
@@ -199,11 +200,12 @@ async function listAll<Item extends z.ZodType>(
   connection: Connection,
   path: string,
   item: Item,
+  query: Record<string, QueryValue> = {},
 ): Promise<Result<z.output<Item>[]>> {
   const items: z.output<Item>[] = [];
   for (let page = 1; ; page += 1) {
     const result = await requestJson(connection, path, pageOf(item), {
-      query: { page, page_size: labelPageSize },
+      query: { ...query, page, page_size: listPageSize },
     });
     if (!result.ok) {
       return result;
@@ -411,6 +413,26 @@ export function createPaperlessClient<File>(options: ClientOptions<File>) {
         body: form,
         timeoutMs: uploadTimeoutMs,
       });
+    },
+
+    async getTask(taskId: TaskId): Promise<Result<TaskStatus>> {
+      const result = await requestJson(connection, 'tasks/', pageOf(Task), { query: { task_id: taskId } });
+      if (!result.ok) {
+        return result;
+      }
+      return success(taskStatus(result.value.items[0]));
+    },
+
+    async findUnfinishedConsumeTask(filename: string): Promise<Result<TaskId | null>> {
+      const result = await listAll(connection, 'tasks/', Task, {
+        task_type: 'consume_file',
+        is_complete: false,
+      });
+      if (!result.ok) {
+        return result;
+      }
+      const match = result.value.find((task) => task.input_data.filename === filename);
+      return success(match?.task_id ?? null);
     },
   };
 }
