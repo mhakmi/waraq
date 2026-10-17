@@ -5,7 +5,7 @@ import type { DocumentId, IsoDate } from '../src/paperless/schemas';
 import {
   client,
   clientWithToken,
-  createTag,
+  createLabel,
   eventually,
   serverUrl,
   uniqueName,
@@ -76,8 +76,8 @@ describe('documents', () => {
   let firstOnly: DocumentId;
 
   beforeAll(async () => {
-    firstTag = await createTag(uniqueName('first'));
-    secondTag = await createTag(uniqueName('second'));
+    firstTag = await createLabel('tags', uniqueName('first'));
+    secondTag = await createLabel('tags', uniqueName('second'));
     bothTagged = await uploadAndWait(`${marker} both`, [firstTag, secondTag], '2024-03-05' as IsoDate);
     firstOnly = await uploadAndWait(`${marker} first`, [firstTag], '2025-07-09' as IsoDate);
   });
@@ -137,11 +137,13 @@ describe('documents', () => {
     expect(response.headers.get('content-type')).toBe('image/webp');
   });
 
-  test('labels list includes a tag made for this run', async () => {
+  test('labels list includes a tag and a correspondent made for this run', async () => {
     const tags = await client.listTags();
     expect(tags.ok && tags.value.some((tag) => tag.id === firstTag)).toBe(true);
+    const correspondentId = await createLabel('correspondents', uniqueName('sender'));
+    const correspondents = await client.listCorrespondents();
+    expect(correspondents.ok && correspondents.value.some((item) => item.id === correspondentId)).toBe(true);
     for (const list of [
-      await client.listCorrespondents(),
       await client.listDocumentTypes(),
       await client.listStoragePaths(),
       await client.listCustomFields(),

@@ -160,13 +160,11 @@ export const Correspondent = z
     id: z.number().int(),
     name: z.string(),
     document_count: z.number().int(),
-    last_correspondence: z.string().nullable(),
   })
   .transform((correspondent) => ({
     id: correspondent.id,
     name: correspondent.name,
     documentCount: correspondent.document_count,
-    lastCorrespondence: correspondent.last_correspondence,
   }));
 export type Correspondent = z.infer<typeof Correspondent>;
 

@@ -24,14 +24,14 @@ export function uniqueName(prefix: string): string {
   return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 }
 
-export async function createTag(name: string): Promise<number> {
-  const response = await fetch(`${serverUrl}/api/tags/`, {
+export async function createLabel(kind: 'tags' | 'correspondents', name: string): Promise<number> {
+  const response = await fetch(`${serverUrl}/api/${kind}/`, {
     method: 'POST',
     headers: { Authorization: `Token ${token}`, 'Content-Type': 'application/json' },
     body: JSON.stringify({ name }),
   });
   if (!response.ok) {
-    throw new Error(`Could not create tag ${name}: ${response.status} ${await response.text()}`);
+    throw new Error(`Could not create ${kind} ${name}: ${response.status} ${await response.text()}`);
   }
   const body = (await response.json()) as { id: number };
   return body.id;

@@ -29,7 +29,7 @@ function document(id: number, added: string, tagIds: number[], correspondentId: 
 
 const tags = [tag(1, 'Inbox', true), tag(2, 'Bills'), tag(3, 'To file', true)];
 const correspondents: Correspondent[] = [
-  { id: 9, name: 'Northfield Hydro', documentCount: 1, lastCorrespondence: null },
+  { id: 9, name: 'Northfield Hydro', documentCount: 1 },
 ];
 
 describe('groupFor', () => {
