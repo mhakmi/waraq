@@ -162,15 +162,17 @@ sequenceDiagram
 	Queue->>Server: POST /api/documents/post_document/ with <id>.pdf
 	Note over Queue,Server: the app is killed before the reply
 	Queue->>Queue: next start finds the job in sending, marks it as maybe sent
-	Queue->>Server: GET /api/documents/?original_filename__iexact=<id>.pdf
-	alt the document exists
+	Queue->>Server: GET /api/tasks/?task_type=consume_file&date_created_after=<a day before the job>
+	alt a task has input file <id>.pdf
+		Server-->>Queue: that task, whatever its status
+		Queue->>Queue: processing, follow that task
+	else no task, look for the document
+		Queue->>Server: GET /api/documents/?original_filename__iexact=<id>.pdf
 		Server-->>Queue: document 42
 		Queue->>Queue: done
-	else not yet, look for a running task
-		Queue->>Server: GET /api/tasks/?task_type=consume_file&is_complete=false
-		Server-->>Queue: a task with input file <id>.pdf
-		Queue->>Queue: processing, follow that task
-	else nothing found
+	else nothing found within two minutes of the send
+		Queue->>Queue: look again in thirty seconds
+	else nothing found after that
 		Queue->>Server: send again
 	end
 ```
@@ -187,15 +189,20 @@ stateDiagram-v2
 	waiting --> sending: online and retry time reached
 	sending --> processing: server accepted, task id
 	sending --> waiting: network error, timeout, 5xx, 429
-	sending --> failed: 401 or 403, sign in again
+	sending --> failed: 401, sign in again
+	sending --> failed: 403, missing permission
 	sending --> failed: other 4xx, rejected
 	sending --> waiting: app restarted mid-send, maybe sent
 	waiting --> done: maybe sent, document found
 	waiting --> processing: maybe sent, task found
+	waiting --> failed: 401 or 403 during the lookup
 	processing --> processing: still running, check later
+	processing --> waiting: ten checks without an answer, look it up
+	processing --> failed: 401 or 403 during the check
 	processing --> done: task succeeded
 	processing --> failed: Paperless could not consume it
 	failed --> waiting: retry, or signed in again
+	failed --> processing: signed in again, back to its check
 	done --> [*]
 ```
 

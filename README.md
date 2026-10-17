@@ -25,15 +25,22 @@ stateDiagram-v2
     sending --> waiting: interrupted, maybe sent
     waiting --> done: foundDocument
     waiting --> processing: foundTask
-    waiting --> waiting: notFound or reconcileFailed
-    processing --> processing: taskPending or checkFailed
+    waiting --> waiting: notFound, look again or send again
+    waiting --> waiting: reconcileFailed, retry later
+    waiting --> failed: reconcileFailed, 401 or 403
+    processing --> processing: taskPending, taskUnknown, or checkFailed
+    processing --> waiting: ten checks in a row without an answer
+    processing --> failed: checkFailed, 401 or 403
     processing --> done: taskSucceeded
     processing --> failed: taskFailed
     failed --> waiting: signedIn or retryRequested
+    failed --> processing: signedIn or retryRequested, back to its check
     done --> [*]
 ```
 
-The file goes up as `<job id>.pdf`. Paperless-ngx accepts the same file twice, so the app never sends a file again just because it is unsure. If a send may have reached the server, for example after a timeout or an app crash, the job looks for a task or a document with that file name first. It sends again only when neither exists.
+The file goes up as `<job id>.pdf`. Paperless-ngx accepts the same file twice, so the app never sends a file again just because it is unsure. If a send may have reached the server, for example after a timeout or an app crash, the job looks for a consume task with that file name first, whatever the task's status, and then for a document. When it finds neither inside two minutes of the send's start, it looks again thirty seconds later, because the server may still be working on the request. It sends again only when nothing has turned up after that.
+
+A 401 stops the job at `sign_in_required` and a 403 at `not_permitted`. Both remember the step they stopped at (the send, the lookup, or the check of a task) and continue from there once the user signs in or asks for a retry, so a file the server may already have is never sent again blindly.
 
 Three rules keep two copies of a job from sending the same file:
 
