@@ -14,6 +14,8 @@ import { connectQueriesToDevice, queryClient, savedForMs } from '../src/query';
 import { SessionProvider, useSession } from '../src/session';
 import { useColors, useIsDark } from '../src/theme';
 import { Button } from '../src/ui/Button';
+import { registerUploadTask } from '../src/upload/background';
+import { connectUploadsToDevice, runUploads } from '../src/upload/queue';
 
 const persistOptions = {
   persister: queryPersister,
@@ -45,10 +47,18 @@ function SystemBars() {
 function Screens() {
   const { state } = useSession();
   const colors = useColors();
+  const signedIn = state.kind === 'signedIn';
+  useEffect(() => {
+    if (!signedIn) {
+      return;
+    }
+    registerUploadTask().catch((error) => console.warn('The background upload task could not be registered', error));
+    runUploads();
+    return connectUploadsToDevice();
+  }, [signedIn]);
   if (state.kind === 'loading') {
     return <View style={[styles.fill, { backgroundColor: colors.surface }]} />;
   }
-  const signedIn = state.kind === 'signedIn';
   return (
     <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.surface } }}>
       <Stack.Protected guard={signedIn}>
