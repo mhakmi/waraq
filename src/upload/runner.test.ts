@@ -45,6 +45,12 @@ function jobIn(state: UploadState, pdfPath: string | null): UploadJob {
   return { ...job, pdfPath, state };
 }
 
+async function storing(job: UploadJob): Promise<MemoryJobStore> {
+  const store = new MemoryJobStore();
+  await store.insert(job);
+  return store;
+}
+
 function depsAt(now: number, store: MemoryJobStore, client: UploadClient<string> = offlineClient): RunnerDeps<string> {
   return {
     client,
@@ -65,7 +71,7 @@ describe('reconcile', () => {
   const unsure = jobIn({ kind: 'waiting', attempt: 1, notBefore: 0, maybeSent: true, startedAt }, '/file.pdf');
 
   async function reconcileWith(client: Partial<UploadClient<string>>, job = unsure) {
-    const next = await runStep(job, depsAt(now, new MemoryJobStore(), { ...offlineClient, ...client }));
+    const next = await runStep(job, depsAt(now, await storing(job), { ...offlineClient, ...client }));
     return next.state;
   }
 
@@ -140,7 +146,7 @@ describe('check', () => {
   );
 
   test('stops at sign-in and resumes the check with its task id after a 401', async () => {
-    const deps = depsAt(now, new MemoryJobStore(), { ...offlineClient, getTask: async () => unauthorized });
+    const deps = depsAt(now, await storing(processing), { ...offlineClient, getTask: async () => unauthorized });
     const next = await runStep(processing, deps);
     expect(next.state).toEqual({
       kind: 'failed',
@@ -151,21 +157,40 @@ describe('check', () => {
 
 describe('MemoryJobStore', () => {
   test('refuses a write from a copy that is no longer the stored one', async () => {
-    const store = new MemoryJobStore();
     const job = jobIn({ kind: 'preparing' }, null);
+    const store = await storing(job);
     const moved = { ...job, updatedAt: job.updatedAt + 1 };
 
-    expect(await store.saveIfUnchanged(job, job.updatedAt)).toBe(true);
     expect(await store.saveIfUnchanged(moved, job.updatedAt)).toBe(true);
     expect(await store.saveIfUnchanged({ ...job, pageCount: 2 }, job.updatedAt)).toBe(false);
     expect(await store.loadAll()).toEqual([moved]);
+  });
+
+  test('refuses a write for a row that is gone', async () => {
+    const store = new MemoryJobStore();
+    const job = jobIn({ kind: 'preparing' }, null);
+
+    expect(await store.saveIfUnchanged(job, job.updatedAt)).toBe(false);
+    expect(await store.loadAll()).toEqual([]);
+  });
+
+  test('refuses a delete from a copy that is no longer the stored one', async () => {
+    const job = jobIn({ kind: 'preparing' }, null);
+    const store = await storing(job);
+    const moved = { ...job, updatedAt: job.updatedAt + 1 };
+    await store.saveIfUnchanged(moved, job.updatedAt);
+
+    expect(await store.deleteIfUnchanged(job.id, job.updatedAt)).toBe(false);
+    expect(await store.loadAll()).toEqual([moved]);
+    expect(await store.deleteIfUnchanged(job.id, moved.updatedAt)).toBe(true);
+    expect(await store.loadAll()).toEqual([]);
   });
 });
 
 describe('runStep', () => {
   test('two runners that loaded the same job send it once', async () => {
-    const store = new MemoryJobStore();
     const job = jobIn({ kind: 'waiting', attempt: 0, notBefore: 0, maybeSent: false }, '/file.pdf');
+    const store = await storing(job);
     let posts = 0;
     const counting: UploadClient<string> = {
       ...offlineClient,
@@ -183,10 +208,30 @@ describe('runStep', () => {
     expect(await store.loadAll()).toEqual(results.filter((result) => result.state.kind === 'processing'));
   });
 
+  test('a job the user deleted after it was loaded is not sent and does not come back', async () => {
+    const job = jobIn({ kind: 'waiting', attempt: 0, notBefore: 0, maybeSent: false }, '/file.pdf');
+    const store = await storing(job);
+    let posts = 0;
+    const counting: UploadClient<string> = {
+      ...offlineClient,
+      postDocument: async () => {
+        posts += 1;
+        return success(taskId);
+      },
+    };
+    const deps = { ...depsAt(job.updatedAt, store, counting), readFile: async () => 'pdf bytes' };
+
+    expect(await deleteJob(job, store)).toBe(true);
+    const next = await runStep(job, deps);
+
+    expect(posts).toBe(0);
+    expect(next).toBe(job);
+    expect(await store.loadAll()).toEqual([]);
+  });
 
   test('a PDF that is gone from disk fails the job without calling the server', async () => {
-    const store = new MemoryJobStore();
     const job = jobIn({ kind: 'waiting', attempt: 0, notBefore: 0, maybeSent: false }, '/gone.pdf');
+    const store = await storing(job);
 
     const next = await runStep(job, depsAt(10, store));
 
@@ -195,8 +240,8 @@ describe('runStep', () => {
   });
 
   test('a clock that steps back between two reads cannot refuse a send that was due', async () => {
-    const store = new MemoryJobStore();
     const job = jobIn({ kind: 'waiting', attempt: 0, notBefore: 1000, maybeSent: false }, '/file.pdf');
+    const store = await storing(job);
     const clock = [1000, 900];
     const deps: RunnerDeps<string> = {
       ...depsAt(0, store, { ...offlineClient, postDocument: async () => success(taskId) }),
@@ -210,10 +255,9 @@ describe('runStep', () => {
   });
 
   test('a send pushed further ahead than any retry by a clock set back runs now', async () => {
-    const store = new MemoryJobStore();
     const job = jobIn({ kind: 'waiting', attempt: 0, notBefore: now + 31 * 60_000, maybeSent: false }, '/gone.pdf');
 
-    const next = await runStep(job, depsAt(now, store));
+    const next = await runStep(job, depsAt(now, await storing(job)));
 
     expect(next.state).toEqual({ kind: 'failed', reason: { kind: 'file_missing' } });
   });
@@ -229,9 +273,8 @@ describe('runStep', () => {
 
 describe('recoverAfterRestart', () => {
   test('writes the interrupted job back so the next step starts from the stored copy', async () => {
-    const store = new MemoryJobStore();
     const job = jobIn({ kind: 'sending', attempt: 0, startedAt: 0 }, '/file.pdf');
-    await store.saveIfUnchanged(job, job.updatedAt);
+    const store = await storing(job);
 
     const recovered = await recoverAfterRestart(job, store, 10);
 
@@ -242,18 +285,26 @@ describe('recoverAfterRestart', () => {
 
 describe('deleteJob', () => {
   test('refuses a job that is being sent and keeps it stored', async () => {
-    const store = new MemoryJobStore();
     const job = jobIn({ kind: 'sending', attempt: 0, startedAt: 0 }, '/file.pdf');
-    await store.saveIfUnchanged(job, job.updatedAt);
+    const store = await storing(job);
 
     expect(await deleteJob(job, store)).toBe(false);
     expect(await store.loadAll()).toEqual([job]);
   });
 
+  test('refuses a stale copy of a job that a runner has since claimed', async () => {
+    const job = jobIn({ kind: 'waiting', attempt: 0, notBefore: 0, maybeSent: false }, '/file.pdf');
+    const store = await storing(job);
+    const sending: UploadJob = { ...job, updatedAt: job.updatedAt + 1, state: { kind: 'sending', attempt: 0, startedAt: 1 } };
+    await store.saveIfUnchanged(sending, job.updatedAt);
+
+    expect(await deleteJob(job, store)).toBe(false);
+    expect(await store.loadAll()).toEqual([sending]);
+  });
+
   test('removes a finished job', async () => {
-    const store = new MemoryJobStore();
     const job = jobIn({ kind: 'failed', reason: { kind: 'file_missing' } }, null);
-    await store.saveIfUnchanged(job, job.updatedAt);
+    const store = await storing(job);
 
     expect(await deleteJob(job, store)).toBe(true);
     expect(await store.loadAll()).toEqual([]);

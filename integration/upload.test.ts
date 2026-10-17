@@ -47,9 +47,9 @@ function fieldsTitled(title: string): UploadFields {
   };
 }
 
-function queueJob(title: string): UploadJob {
+async function queueJob(store: MemoryJobStore, title: string): Promise<UploadJob> {
   const now = Date.now();
-  return newUploadJob({
+  const job = newUploadJob({
     id: JobId.parse(uuidV7(now, randomBytes(10))),
     accountId: AccountId.parse('test-account'),
     batchId: BatchId.parse(uuidV7(now, randomBytes(10))),
@@ -57,6 +57,8 @@ function queueJob(title: string): UploadJob {
     pageCount: 1,
     now,
   });
+  await store.insert(job);
+  return job;
 }
 
 function depsFor(
@@ -109,9 +111,10 @@ describe('runStep against a real server', () => {
   test('a queued document ends as done with the id of a real document', async () => {
     const before = await documentCount();
     const title = uniqueName('happy path');
-    const job = queueJob(title);
+    const store = new MemoryJobStore();
+    const job = await queueJob(store, title);
 
-    const finished = await runUntilSettled(job, depsFor(client, new MemoryJobStore()));
+    const finished = await runUntilSettled(job, depsFor(client, store));
 
     expect(finished.state.kind).toBe('done');
     if (finished.state.kind !== 'done') {
@@ -134,7 +137,7 @@ describe('runStep against a real server', () => {
       },
     };
 
-    const job = queueJob(uniqueName('crash path'));
+    const job = await queueJob(store, uniqueName('crash path'));
     const prepared = await runStep(job, depsFor(client, store));
     await expect(runStep(prepared, depsFor(crashingClient, store))).rejects.toThrow('killed');
 
@@ -161,7 +164,7 @@ describe('runStep against a real server', () => {
       },
     };
 
-    const job = queueJob(uniqueName('late task'));
+    const job = await queueJob(store, uniqueName('late task'));
     const prepared = await runStep(job, depsFor(client, store));
     await expect(runStep(prepared, depsFor(lateServer, store))).rejects.toThrow('killed');
 
@@ -179,9 +182,10 @@ describe('runStep against a real server', () => {
 
   test('a file Paperless cannot read ends as consumption_failed', async () => {
     const before = await documentCount();
-    const job = queueJob(uniqueName('corrupt'));
+    const store = new MemoryJobStore();
+    const job = await queueJob(store, uniqueName('corrupt'));
 
-    const finished = await runUntilSettled(job, depsFor(client, new MemoryJobStore(), corruptPdf));
+    const finished = await runUntilSettled(job, depsFor(client, store, corruptPdf));
 
     expect(finished.state).toMatchObject({ kind: 'failed', reason: { kind: 'consumption_failed' } });
     expect(await documentCount()).toBe(before);
@@ -190,7 +194,7 @@ describe('runStep against a real server', () => {
   test('a bad token ends as sign_in_required and sends nothing', async () => {
     const before = await documentCount();
     const store = new MemoryJobStore();
-    const job = queueJob(uniqueName('bad token'));
+    const job = await queueJob(store, uniqueName('bad token'));
 
     const finished = await runUntilSettled(job, depsFor(clientWithToken('not-a-real-token'), store));
 

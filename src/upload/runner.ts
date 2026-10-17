@@ -14,8 +14,9 @@ import {
 
 export interface JobStore {
   loadAll(): Promise<UploadJob[]>;
+  insert(job: UploadJob): Promise<void>;
   saveIfUnchanged(job: UploadJob, loadedUpdatedAt: number): Promise<boolean>;
-  delete(id: JobId): Promise<void>;
+  deleteIfUnchanged(id: JobId, loadedUpdatedAt: number): Promise<boolean>;
 }
 
 export class MemoryJobStore implements JobStore {
@@ -25,17 +26,24 @@ export class MemoryJobStore implements JobStore {
     return Array.from(this.jobs.values(), (job) => structuredClone(job));
   }
 
+  async insert(job: UploadJob): Promise<void> {
+    this.jobs.set(job.id, structuredClone(job));
+  }
+
   async saveIfUnchanged(job: UploadJob, loadedUpdatedAt: number): Promise<boolean> {
-    const stored = this.jobs.get(job.id);
-    if (stored !== undefined && stored.updatedAt !== loadedUpdatedAt) {
+    if (this.jobs.get(job.id)?.updatedAt !== loadedUpdatedAt) {
       return false;
     }
     this.jobs.set(job.id, structuredClone(job));
     return true;
   }
 
-  async delete(id: JobId): Promise<void> {
+  async deleteIfUnchanged(id: JobId, loadedUpdatedAt: number): Promise<boolean> {
+    if (this.jobs.get(id)?.updatedAt !== loadedUpdatedAt) {
+      return false;
+    }
     this.jobs.delete(id);
+    return true;
   }
 }
 
@@ -155,6 +163,5 @@ export async function deleteJob(job: UploadJob, store: JobStore): Promise<boolea
   if (!canDelete(job.state)) {
     return false;
   }
-  await store.delete(job.id);
-  return true;
+  return store.deleteIfUnchanged(job.id, job.updatedAt);
 }
