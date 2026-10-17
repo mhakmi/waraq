@@ -26,6 +26,7 @@ const startedAt = now - 1000;
 const startedLongAgo = now - sentGraceWindow;
 const taskId = 'task-1' as TaskId;
 const documentId = 42 as DocumentId;
+const offline: PaperlessError = { kind: 'network', message: 'offline' };
 
 const states = {
   preparing: { kind: 'preparing' },
@@ -36,7 +37,10 @@ const states = {
   sending: { kind: 'sending', attempt: 2, startedAt },
   processing: { kind: 'processing', taskId, checks: 3, nextCheckAt: earlier },
   done: { kind: 'done', documentId },
-  failedSignIn: { kind: 'failed', reason: { kind: 'sign_in_required' } },
+  failedSignIn: { kind: 'failed', reason: { kind: 'sign_in_required', resume: { step: 'send' } } },
+  failedSignInReconcile: { kind: 'failed', reason: { kind: 'sign_in_required', resume: { step: 'reconcile', startedAt } } },
+  failedSignInCheck: { kind: 'failed', reason: { kind: 'sign_in_required', resume: { step: 'check', taskId } } },
+  failedNotPermitted: { kind: 'failed', reason: { kind: 'not_permitted', resume: { step: 'reconcile', startedAt } } },
   failedRejected: { kind: 'failed', reason: { kind: 'rejected', status: 413, message: 'too big' } },
   failedConsumption: { kind: 'failed', reason: { kind: 'consumption_failed', message: 'bad pdf' } },
   failedFileMissing: { kind: 'failed', reason: { kind: 'file_missing' } },
@@ -49,14 +53,15 @@ const events = {
   fileMissing: { kind: 'fileMissing' },
   sendStarted: { kind: 'sendStarted' },
   sendAccepted: { kind: 'sendAccepted', taskId },
-  sendFailed: { kind: 'sendFailed', error: { kind: 'network', message: 'offline' } },
+  sendFailed: { kind: 'sendFailed', error: offline },
   interrupted: { kind: 'interrupted' },
   foundDocument: { kind: 'foundDocument', documentId },
   foundTask: { kind: 'foundTask', taskId },
   notFound: { kind: 'notFound' },
-  reconcileFailed: { kind: 'reconcileFailed' },
+  reconcileFailed: { kind: 'reconcileFailed', error: offline },
   taskPending: { kind: 'taskPending' },
-  checkFailed: { kind: 'checkFailed' },
+  taskUnknown: { kind: 'taskUnknown' },
+  checkFailed: { kind: 'checkFailed', error: offline },
   taskSucceeded: { kind: 'taskSucceeded', documentId },
   taskFailed: { kind: 'taskFailed', message: 'bad pdf' },
   signedIn: { kind: 'signedIn' },
@@ -73,9 +78,12 @@ const accepted: Record<StateName, EventName[]> = {
   waitingMaybeSent: ['foundDocument', 'foundTask', 'notFound', 'reconcileFailed'],
   waitingMaybeSentLongAgo: ['foundDocument', 'foundTask', 'notFound', 'reconcileFailed'],
   sending: ['sendAccepted', 'sendFailed', 'interrupted'],
-  processing: ['taskPending', 'checkFailed', 'taskSucceeded', 'taskFailed'],
+  processing: ['taskPending', 'taskUnknown', 'checkFailed', 'taskSucceeded', 'taskFailed'],
   done: [],
   failedSignIn: ['signedIn'],
+  failedSignInReconcile: ['signedIn'],
+  failedSignInCheck: ['signedIn'],
+  failedNotPermitted: ['retryRequested'],
   failedRejected: ['retryRequested'],
   failedConsumption: ['retryRequested'],
   failedFileMissing: [],
@@ -99,10 +107,14 @@ describe('transitions the table accepts', () => {
     ['waitingMaybeSentLongAgo', events.notFound, { kind: 'waiting', attempt: 2, notBefore: now, maybeSent: false }],
     ['waitingMaybeSent', events.reconcileFailed, { kind: 'waiting', attempt: 3, notBefore: now + 20_000, maybeSent: true, startedAt }],
     ['processing', events.taskPending, { kind: 'processing', taskId, checks: 4, nextCheckAt: now + 32_000 }],
+    ['processing', events.taskUnknown, { kind: 'processing', taskId, checks: 4, nextCheckAt: now + 32_000 }],
     ['processing', events.checkFailed, { kind: 'processing', taskId, checks: 4, nextCheckAt: now + 32_000 }],
     ['processing', events.taskSucceeded, { kind: 'done', documentId }],
     ['processing', events.taskFailed, { kind: 'failed', reason: { kind: 'consumption_failed', message: 'bad pdf' } }],
     ['failedSignIn', events.signedIn, freshWait],
+    ['failedSignInReconcile', events.signedIn, { kind: 'waiting', attempt: 0, notBefore: now, maybeSent: true, startedAt }],
+    ['failedSignInCheck', events.signedIn, { kind: 'processing', taskId, checks: 0, nextCheckAt: now }],
+    ['failedNotPermitted', events.retryRequested, { kind: 'waiting', attempt: 0, notBefore: now, maybeSent: true, startedAt }],
     ['failedRejected', events.retryRequested, freshWait],
     ['failedConsumption', events.retryRequested, freshWait],
   ])('%s + %o', (stateName, event, expected) => {
@@ -119,8 +131,8 @@ describe('a failed send', () => {
     [{ kind: 'server', status: 502 }, retryMaybeSent],
     [{ kind: 'invalid_response', message: 'not json' }, retryMaybeSent],
     [{ kind: 'rate_limited' }, { kind: 'waiting', attempt: 3, notBefore: now + 20_000, maybeSent: false }],
-    [{ kind: 'unauthorized' }, { kind: 'failed', reason: { kind: 'sign_in_required' } }],
-    [{ kind: 'forbidden' }, { kind: 'failed', reason: { kind: 'sign_in_required' } }],
+    [{ kind: 'unauthorized' }, { kind: 'failed', reason: { kind: 'sign_in_required', resume: { step: 'send' } } }],
+    [{ kind: 'forbidden' }, { kind: 'failed', reason: { kind: 'not_permitted', resume: { step: 'send' } } }],
     [
       { kind: 'rejected', status: 413, body: 'Request Entity Too Large' },
       { kind: 'failed', reason: { kind: 'rejected', status: 413, message: 'Request Entity Too Large' } },
@@ -128,6 +140,37 @@ describe('a failed send', () => {
     [{ kind: 'not_found' }, { kind: 'failed', reason: { kind: 'rejected', status: 404, message: '' } }],
   ])('with %o', (error, expected) => {
     expect(transition(states.sending, { kind: 'sendFailed', error }, now)).toEqual(expected);
+  });
+});
+
+describe('a failed reconcile', () => {
+  const resume = { step: 'reconcile', startedAt } as const;
+  const retryMaybeSent: UploadState = { kind: 'waiting', attempt: 3, notBefore: now + 20_000, maybeSent: true, startedAt };
+
+  test.each<[PaperlessError, UploadState]>([
+    [offline, retryMaybeSent],
+    [{ kind: 'timeout' }, retryMaybeSent],
+    [{ kind: 'server', status: 502 }, retryMaybeSent],
+    [{ kind: 'rate_limited' }, retryMaybeSent],
+    [{ kind: 'invalid_response', message: 'not json' }, retryMaybeSent],
+    [{ kind: 'unauthorized' }, { kind: 'failed', reason: { kind: 'sign_in_required', resume } }],
+    [{ kind: 'forbidden' }, { kind: 'failed', reason: { kind: 'not_permitted', resume } }],
+  ])('with %o', (error, expected) => {
+    expect(transition(states.waitingMaybeSent, { kind: 'reconcileFailed', error }, now)).toEqual(expected);
+  });
+});
+
+describe('a failed check', () => {
+  const resume = { step: 'check', taskId } as const;
+  const checkAgain: UploadState = { kind: 'processing', taskId, checks: 4, nextCheckAt: now + 32_000 };
+
+  test.each<[PaperlessError, UploadState]>([
+    [offline, checkAgain],
+    [{ kind: 'server', status: 502 }, checkAgain],
+    [{ kind: 'unauthorized' }, { kind: 'failed', reason: { kind: 'sign_in_required', resume } }],
+    [{ kind: 'forbidden' }, { kind: 'failed', reason: { kind: 'not_permitted', resume } }],
+  ])('with %o', (error, expected) => {
+    expect(transition(states.processing, { kind: 'checkFailed', error }, now)).toEqual(expected);
   });
 });
 

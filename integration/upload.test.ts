@@ -190,7 +190,7 @@ describe('runStep against a real server', () => {
 
     const finished = await runUntilSettled(job, depsFor(clientWithToken('not-a-real-token'), store));
 
-    expect(finished.state).toEqual({ kind: 'failed', reason: { kind: 'sign_in_required' } });
+    expect(finished.state).toEqual({ kind: 'failed', reason: { kind: 'sign_in_required', resume: { step: 'send' } } });
     expect(await documentCount()).toBe(before);
 
     const signedIn = { ...finished, state: transition(finished.state, { kind: 'signedIn' }, Date.now()) };

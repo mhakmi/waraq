@@ -64,14 +64,14 @@ async function reconcile<File>(job: UploadJob, client: UploadClient<File>): Prom
   const filename = uploadFilename(job.id);
   const task = await client.findConsumeTaskByFilename(filename, new Date(job.createdAt - day));
   if (!task.ok) {
-    return { kind: 'reconcileFailed' };
+    return { kind: 'reconcileFailed', error: task.error };
   }
   if (task.value !== null) {
     return { kind: 'foundTask', taskId: task.value };
   }
   const document = await client.findDocumentByOriginalFilename(filename);
   if (!document.ok) {
-    return { kind: 'reconcileFailed' };
+    return { kind: 'reconcileFailed', error: document.error };
   }
   if (document.value !== null) {
     return { kind: 'foundDocument', documentId: document.value };
@@ -96,7 +96,7 @@ async function send<File>(job: UploadJob, deps: RunnerDeps<File>): Promise<Uploa
 async function check<File>(taskId: TaskId, client: UploadClient<File>): Promise<UploadEvent> {
   const result = await client.getTask(taskId);
   if (!result.ok) {
-    return { kind: 'checkFailed' };
+    return { kind: 'checkFailed', error: result.error };
   }
   const status = result.value;
   switch (status.kind) {
@@ -107,7 +107,7 @@ async function check<File>(taskId: TaskId, client: UploadClient<File>): Promise<
     case 'failed':
       return { kind: 'taskFailed', message: status.message };
     case 'unknown':
-      return { kind: 'checkFailed' };
+      return { kind: 'taskUnknown' };
   }
 }
 

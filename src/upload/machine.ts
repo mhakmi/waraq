@@ -15,8 +15,14 @@ export type BatchId = z.infer<typeof BatchId>;
 export const AccountId = z.string().min(1).brand<'AccountId'>();
 export type AccountId = z.infer<typeof AccountId>;
 
+export type ResumePoint =
+  | { step: 'send' }
+  | { step: 'reconcile'; startedAt: number }
+  | { step: 'check'; taskId: TaskId };
+
 export type FailureReason =
-  | { kind: 'sign_in_required' }
+  | { kind: 'sign_in_required'; resume: ResumePoint }
+  | { kind: 'not_permitted'; resume: ResumePoint }
   | { kind: 'rejected'; status: number; message: string }
   | { kind: 'consumption_failed'; message: string }
   | { kind: 'file_missing' }
@@ -54,9 +60,10 @@ export type UploadEvent =
   | { kind: 'foundDocument'; documentId: DocumentId }
   | { kind: 'foundTask'; taskId: TaskId }
   | { kind: 'notFound' }
-  | { kind: 'reconcileFailed' }
+  | { kind: 'reconcileFailed'; error: PaperlessError }
   | { kind: 'taskPending' }
-  | { kind: 'checkFailed' }
+  | { kind: 'taskUnknown' }
+  | { kind: 'checkFailed'; error: PaperlessError }
   | { kind: 'taskSucceeded'; documentId: DocumentId }
   | { kind: 'taskFailed'; message: string }
   | { kind: 'signedIn' }
@@ -104,6 +111,27 @@ function waitToReconcile(attempt: number, notBefore: number, startedAt: number):
   return { kind: 'waiting', attempt, notBefore, maybeSent: true, startedAt };
 }
 
+function accessFailure(error: PaperlessError, resume: ResumePoint): UploadState | null {
+  if (error.kind === 'unauthorized') {
+    return { kind: 'failed', reason: { kind: 'sign_in_required', resume } };
+  }
+  if (error.kind === 'forbidden') {
+    return { kind: 'failed', reason: { kind: 'not_permitted', resume } };
+  }
+  return null;
+}
+
+function resumeAt(resume: ResumePoint, now: number): UploadState {
+  switch (resume.step) {
+    case 'send':
+      return waitToSend(0, now);
+    case 'reconcile':
+      return waitToReconcile(0, now, resume.startedAt);
+    case 'check':
+      return { kind: 'processing', taskId: resume.taskId, checks: 0, nextCheckAt: now };
+  }
+}
+
 function afterSendFailure(state: StateOf<'sending'>, error: PaperlessError, now: number): UploadState {
   const retryAt = now + sendRetryDelay(state.attempt);
   switch (error.kind) {
@@ -115,8 +143,9 @@ function afterSendFailure(state: StateOf<'sending'>, error: PaperlessError, now:
     case 'rate_limited':
       return waitToSend(state.attempt + 1, retryAt);
     case 'unauthorized':
+      return { kind: 'failed', reason: { kind: 'sign_in_required', resume: { step: 'send' } } };
     case 'forbidden':
-      return { kind: 'failed', reason: { kind: 'sign_in_required' } };
+      return { kind: 'failed', reason: { kind: 'not_permitted', resume: { step: 'send' } } };
     case 'not_found':
       return { kind: 'failed', reason: { kind: 'rejected', status: 404, message: '' } };
     case 'rejected':
@@ -167,10 +196,15 @@ const transitions: TransitionTable = {
       }
       return waitToSend(state.attempt, now);
     },
-    reconcileFailed: (state, _event, now) =>
-      state.maybeSent
-        ? waitToReconcile(state.attempt + 1, now + sendRetryDelay(state.attempt), state.startedAt)
-        : 'refused',
+    reconcileFailed: (state, event, now) => {
+      if (!state.maybeSent) {
+        return 'refused';
+      }
+      return (
+        accessFailure(event.error, { step: 'reconcile', startedAt: state.startedAt }) ??
+        waitToReconcile(state.attempt + 1, now + sendRetryDelay(state.attempt), state.startedAt)
+      );
+    },
   },
   sending: {
     sendAccepted: (_state, event, now) => ({
@@ -184,7 +218,9 @@ const transitions: TransitionTable = {
   },
   processing: {
     taskPending: (state, _event, now) => nextCheck(state, now),
-    checkFailed: (state, _event, now) => nextCheck(state, now),
+    taskUnknown: (state, _event, now) => nextCheck(state, now),
+    checkFailed: (state, event, now) =>
+      accessFailure(event.error, { step: 'check', taskId: state.taskId }) ?? nextCheck(state, now),
     taskSucceeded: (_state, event) => ({ kind: 'done', documentId: event.documentId }),
     taskFailed: (_state, event) => ({
       kind: 'failed',
@@ -194,11 +230,18 @@ const transitions: TransitionTable = {
   done: {},
   failed: {
     signedIn: (state, _event, now) =>
-      state.reason.kind === 'sign_in_required' ? waitToSend(0, now) : 'refused',
-    retryRequested: (state, _event, now) =>
-      state.reason.kind === 'rejected' || state.reason.kind === 'consumption_failed'
-        ? waitToSend(0, now)
-        : 'refused',
+      state.reason.kind === 'sign_in_required' ? resumeAt(state.reason.resume, now) : 'refused',
+    retryRequested: (state, _event, now) => {
+      switch (state.reason.kind) {
+        case 'rejected':
+        case 'consumption_failed':
+          return waitToSend(0, now);
+        case 'not_permitted':
+          return resumeAt(state.reason.resume, now);
+        default:
+          return 'refused';
+      }
+    },
   },
 };
 
