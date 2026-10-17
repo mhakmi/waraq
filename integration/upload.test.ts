@@ -88,7 +88,11 @@ async function runUntilSettled(job: UploadJob, deps: RunnerDeps<Blob>): Promise<
     if (wait > 0) {
       await new Promise((resolve) => setTimeout(resolve, wait));
     }
-    current = await runStep(current, deps);
+    const next = await runStep(current, deps);
+    if (next === current) {
+      throw new Error(`runStep made no progress on a due ${step.effect}`);
+    }
+    current = next;
   }
 }
 
@@ -136,7 +140,7 @@ describe('runStep against a real server', () => {
 
     const [saved] = await store.loadAll();
     expect(saved.state.kind).toBe('sending');
-    const recovered = recoverAfterRestart(saved, Date.now());
+    const recovered = await recoverAfterRestart(saved, store, Date.now());
     expect(recovered.state).toMatchObject({ kind: 'waiting', maybeSent: true });
 
     const finished = await runUntilSettled(recovered, depsFor(client, store));
@@ -162,7 +166,7 @@ describe('runStep against a real server', () => {
     await expect(runStep(prepared, depsFor(lateServer, store))).rejects.toThrow('killed');
 
     const [saved] = await store.loadAll();
-    const recovered = recoverAfterRestart(saved, Date.now());
+    const recovered = await recoverAfterRestart(saved, store, Date.now());
     const lookedOnce = await runStep(recovered, depsFor(client, store));
     expect(lookedOnce.state).toMatchObject({ kind: 'waiting', maybeSent: true });
 

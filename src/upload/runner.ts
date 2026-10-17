@@ -144,8 +144,11 @@ export async function runStep<File>(job: UploadJob, deps: RunnerDeps<File>): Pro
   }
 }
 
-export function recoverAfterRestart(job: UploadJob, now: number): UploadJob {
-  return job.state.kind === 'sending' ? advance(job, { kind: 'interrupted' }, now) : job;
+export async function recoverAfterRestart(job: UploadJob, store: JobStore, now: number): Promise<UploadJob> {
+  if (job.state.kind !== 'sending') {
+    return job;
+  }
+  return saveOrKeep(store, job, advance(job, { kind: 'interrupted' }, now));
 }
 
 export async function deleteJob(job: UploadJob, store: JobStore): Promise<boolean> {

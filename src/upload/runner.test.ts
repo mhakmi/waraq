@@ -11,7 +11,7 @@ import {
   type UploadJob,
   type UploadState,
 } from './machine';
-import { deleteJob, MemoryJobStore, type RunnerDeps, runStep, type UploadClient } from './runner';
+import { deleteJob, MemoryJobStore, recoverAfterRestart, type RunnerDeps, runStep, type UploadClient } from './runner';
 
 const unreachable = async () => {
   throw new Error('the server must not be called');
@@ -224,6 +224,19 @@ describe('runStep', () => {
 
     expect(await runStep(job, depsAt(4999, store))).toBe(job);
     expect(await store.loadAll()).toEqual([]);
+  });
+});
+
+describe('recoverAfterRestart', () => {
+  test('writes the interrupted job back so the next step starts from the stored copy', async () => {
+    const store = new MemoryJobStore();
+    const job = jobIn({ kind: 'sending', attempt: 0, startedAt: 0 }, '/file.pdf');
+    await store.saveIfUnchanged(job, job.updatedAt);
+
+    const recovered = await recoverAfterRestart(job, store, 10);
+
+    expect(recovered.state).toEqual({ kind: 'waiting', attempt: 1, notBefore: 10, maybeSent: true, startedAt: 0 });
+    expect(await store.loadAll()).toEqual([recovered]);
   });
 });
 
