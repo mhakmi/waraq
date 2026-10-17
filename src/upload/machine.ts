@@ -19,7 +19,7 @@ export type PageRotation = 0 | 90 | 180 | 270;
 
 export type JobInput =
   | { kind: 'pages'; pages: { uri: string; rotation: PageRotation }[] }
-  | { kind: 'pdf'; uri: string };
+  | { kind: 'pdf'; uri: string; thumbnailUri: string };
 
 export type ResumePoint =
   | { step: 'send' }

@@ -72,7 +72,7 @@ const inputByKind = {
     kind: z.literal('pages'),
     pages: z.array(z.object({ uri: z.string(), rotation: z.literal([0, 90, 180, 270]) })),
   }),
-  pdf: z.object({ kind: z.literal('pdf'), uri: z.string() }),
+  pdf: z.object({ kind: z.literal('pdf'), uri: z.string(), thumbnailUri: z.string() }),
 } satisfies Record<JobInput['kind'], z.ZodType>;
 
 const inputSchema: z.ZodType<JobInput> = z.union(Object.values(inputByKind));

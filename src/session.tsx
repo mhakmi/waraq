@@ -8,6 +8,8 @@ import { createPaperlessClient, type PaperlessClient } from './paperless/client'
 import { queryClient } from './query';
 import { forgetBatch } from './scan/store';
 import { clearRecentSearches } from './search/store';
+import { AccountId } from './upload/machine';
+import { accountChanged, reportUploadError, uploadQueue } from './upload/queue';
 
 export type SessionState =
   | { kind: 'loading' }
@@ -37,6 +39,8 @@ export function SessionProvider({ children }: { children: ReactNode }) {
 
   const signIn = useCallback(async (stored: StoredAccount) => {
     await saveAccount(stored);
+    accountChanged();
+    uploadQueue.signedIn(AccountId.parse(stored.account.id)).catch(reportUploadError);
     setState({ kind: 'signedIn', stored });
   }, []);
 
@@ -46,6 +50,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       await clearRecentSearches(state.stored.account.id);
       await forgetBatch();
     }
+    accountChanged();
     queryClient.clear();
     await queryPersister.removeClient();
     setState({ kind: 'signedOut' });
@@ -71,7 +76,6 @@ export function useSignedIn(): StoredAccount {
   return state.stored;
 }
 
-// Uploads come in a later build, so this client takes no files.
 export type AppClient = PaperlessClient<never>;
 
 export function useClient(): AppClient {

@@ -166,7 +166,7 @@ describe('check', () => {
 
 describe('prepare', () => {
   test('a document that arrives as a PDF skips the build and is sent as it is', async () => {
-    const job: UploadJob = { ...jobIn({ kind: 'preparing' }, null), input: { kind: 'pdf', uri: 'file:///shared.pdf' } };
+    const job: UploadJob = { ...jobIn({ kind: 'preparing' }, null), input: { kind: 'pdf', uri: 'file:///shared.pdf', thumbnailUri: 'file:///shared.jpg' } };
     const store = await storing(job);
 
     const next = await runStep(job, depsAt(now, store));

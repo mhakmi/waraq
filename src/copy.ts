@@ -188,6 +188,74 @@ export const copy = {
     keepEditing: 'Keep editing',
   },
 
+  uploads: {
+    title: 'Uploads',
+    defaultTitle: 'Scanned document',
+    states: {
+      preparing: 'Getting ready',
+      waitingOffline: 'Waiting for a connection',
+      waitingToSend: 'Waiting to send',
+      waitingLookup: 'Checking whether your server got it',
+      sending: 'Sending',
+      processing: 'Processing on your server',
+      done: 'Done',
+      signInRequired: 'Sign in again to send',
+      notPermitted: "Your account may not add documents. Ask the server's admin.",
+      rejected: 'The server refused it',
+      consumptionFailed: 'Paperless could not read this file',
+      fileMissing: 'The file for this upload is gone from your phone. Scan the document again.',
+      pdfFailed: 'The PDF could not be made',
+      unreadable: 'The saved details of this upload could not be read. Delete it, then scan the document again.',
+    },
+    retryIn: (waitMs: number, attempt: number) => {
+      const minutes = Math.round(waitMs / 60_000);
+      if (minutes < 1) {
+        return `Trying again in less than a minute (attempt ${attempt})`;
+      }
+      if (minutes === 1) {
+        return `Trying again in 1 minute (attempt ${attempt})`;
+      }
+      return `Trying again in ${minutes} minutes (attempt ${attempt})`;
+    },
+    tooLarge: (bytes: number | null) => {
+      if (bytes === null) {
+        return "Your server's upload limit is smaller than this file.";
+      }
+      const megabytes = (bytes / 1_000_000).toLocaleString(copy.locale, {
+        minimumFractionDigits: 1,
+        maximumFractionDigits: 1,
+      });
+      return `Your server's upload limit is smaller than this file (${megabytes} MB).`;
+    },
+    open: 'Open',
+    retry: 'Retry',
+    delete: 'Delete',
+    emptyTitle: 'Nothing to upload',
+    emptyLead: 'Documents you scan show here until your server has them.',
+    offline: 'You are offline. Uploads wait here and send when you are back online.',
+    closedApp: 'While the app is closed, Android runs uploads about every 15 minutes, at a time it chooses.',
+    batchHeading: (createdAt: number, now: number): string => {
+      const scanned = new Date(createdAt);
+      const today = new Date(now);
+      const yesterday = new Date(now);
+      yesterday.setDate(yesterday.getDate() - 1);
+      const time = scanned.toLocaleTimeString(copy.locale, { hour: 'numeric', minute: '2-digit' });
+      if (scanned.toDateString() === today.toDateString()) {
+        return `Scanned today at ${time}`;
+      }
+      if (scanned.toDateString() === yesterday.toDateString()) {
+        return `Scanned yesterday at ${time}`;
+      }
+      const sameYear = scanned.getFullYear() === today.getFullYear();
+      const day = scanned.toLocaleDateString(copy.locale, {
+        month: 'short',
+        day: 'numeric',
+        year: sameYear ? undefined : 'numeric',
+      });
+      return `Scanned ${day} at ${time}`;
+    },
+  },
+
   placeholder: {
     comingSoon: 'Coming in the next build.',
   },
