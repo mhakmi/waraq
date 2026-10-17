@@ -55,6 +55,7 @@ function Screens() {
         <Stack.Screen name="(tabs)" />
         <Stack.Screen name="scan" />
         <Stack.Screen name="document/[id]/index" />
+        <Stack.Screen name="document/[id]/edit" />
       </Stack.Protected>
       <Stack.Protected guard={!signedIn}>
         <Stack.Screen name="sign-in" />
