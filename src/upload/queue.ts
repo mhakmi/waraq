@@ -24,7 +24,15 @@ const longestWaitMs = 30 * 60_000;
 let storeOpening: Promise<JobStore> | null = null;
 
 function openStore(): Promise<JobStore> {
-  storeOpening ??= expoDatabase('uploads.db').then(openJobStore);
+  if (storeOpening === null) {
+    const opening = expoDatabase('uploads.db').then(openJobStore);
+    storeOpening = opening;
+    opening.catch(() => {
+      if (storeOpening === opening) {
+        storeOpening = null;
+      }
+    });
+  }
   return storeOpening;
 }
 
