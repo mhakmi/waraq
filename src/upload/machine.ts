@@ -17,7 +17,7 @@ export type AccountId = z.infer<typeof AccountId>;
 
 export type ResumePoint =
   | { step: 'send' }
-  | { step: 'reconcile'; startedAt: number }
+  | { step: 'reconcile'; unsureSince: number }
   | { step: 'check'; taskId: TaskId; startedAt: number };
 
 export type FailureReason =
@@ -31,7 +31,7 @@ export type FailureReason =
 export type UploadState =
   | { kind: 'preparing' }
   | { kind: 'waiting'; attempt: number; notBefore: number; maybeSent: false }
-  | { kind: 'waiting'; attempt: number; notBefore: number; maybeSent: true; startedAt: number }
+  | { kind: 'waiting'; attempt: number; notBefore: number; maybeSent: true; unsureSince: number }
   | { kind: 'sending'; attempt: number; startedAt: number }
   | {
       kind: 'processing';
@@ -118,8 +118,8 @@ function waitToSend(attempt: number, notBefore: number): UploadState {
   return { kind: 'waiting', attempt, notBefore, maybeSent: false };
 }
 
-function waitToReconcile(attempt: number, notBefore: number, startedAt: number): UploadState {
-  return { kind: 'waiting', attempt, notBefore, maybeSent: true, startedAt };
+function waitToReconcile(attempt: number, notBefore: number, unsureSince: number): UploadState {
+  return { kind: 'waiting', attempt, notBefore, maybeSent: true, unsureSince };
 }
 
 function startProcessing(taskId: TaskId, nextCheckAt: number, startedAt: number): UploadState {
@@ -141,7 +141,7 @@ function resumeAt(resume: ResumePoint, now: number): UploadState {
     case 'send':
       return waitToSend(0, now);
     case 'reconcile':
-      return waitToReconcile(0, now, resume.startedAt);
+      return waitToReconcile(0, now, resume.unsureSince);
     case 'check':
       return startProcessing(resume.taskId, now, resume.startedAt);
   }
@@ -154,7 +154,7 @@ function afterSendFailure(state: StateOf<'sending'>, error: PaperlessError, now:
     case 'timeout':
     case 'server':
     case 'invalid_response':
-      return waitToReconcile(state.attempt + 1, retryAt, state.startedAt);
+      return waitToReconcile(state.attempt + 1, retryAt, now);
     case 'rate_limited':
       return waitToSend(state.attempt + 1, retryAt);
     case 'unauthorized':
@@ -172,7 +172,7 @@ function nextCheck(state: StateOf<'processing'>, now: number, answered: boolean)
   const checks = state.checks + 1;
   const failedChecks = answered ? 0 : state.failedChecks + 1;
   if (failedChecks >= failedCheckLimit) {
-    return waitToReconcile(0, now, state.startedAt);
+    return waitToReconcile(0, now, now);
   }
   return { ...state, checks, failedChecks, nextCheckAt: now + pollDelay(checks) };
 }
@@ -204,30 +204,31 @@ const transitions: TransitionTable = {
       state.maybeSent ? 'refused' : { kind: 'failed', reason: { kind: 'file_missing' } },
     foundDocument: (state, event) =>
       state.maybeSent ? { kind: 'done', documentId: event.documentId } : 'refused',
-    foundTask: (state, event, now) => (state.maybeSent ? startProcessing(event.taskId, now, now) : 'refused'),
+    foundTask: (state, event, now) =>
+      state.maybeSent ? startProcessing(event.taskId, now, state.unsureSince) : 'refused',
     notFound: (state, _event, now) => {
       if (!state.maybeSent) {
         return 'refused';
       }
-      if (now - state.startedAt < sentGraceWindow) {
+      if (now - state.unsureSince < sentGraceWindow) {
         return { ...state, notBefore: now + graceRecheckDelay };
       }
-      return waitToSend(state.attempt, now);
+      return waitToSend(state.attempt, now + sendRetryDelay(state.attempt));
     },
     reconcileFailed: (state, event, now) => {
       if (!state.maybeSent) {
         return 'refused';
       }
       return (
-        accessFailure(event.error, { step: 'reconcile', startedAt: state.startedAt }) ??
-        waitToReconcile(state.attempt + 1, now + sendRetryDelay(state.attempt), state.startedAt)
+        accessFailure(event.error, { step: 'reconcile', unsureSince: state.unsureSince }) ??
+        waitToReconcile(state.attempt + 1, now + sendRetryDelay(state.attempt), state.unsureSince)
       );
     },
   },
   sending: {
     sendAccepted: (_state, event, now) => startProcessing(event.taskId, now + pollDelay(0), now),
     sendFailed: (state, event, now) => afterSendFailure(state, event.error, now),
-    interrupted: (state, _event, now) => waitToReconcile(state.attempt + 1, now, state.startedAt),
+    interrupted: (state, _event, now) => waitToReconcile(state.attempt + 1, now, now),
   },
   processing: {
     taskPending: (state, _event, now) => nextCheck(state, now, true),

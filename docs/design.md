@@ -154,7 +154,7 @@ The queue is the part people trust or stop using. Upload problems are the second
 
 Paperless-ngx accepts duplicates, so a retry after a lost reply would make a second document. Waraq avoids that with the file name. Each document gets an id when it is queued, a UUID version 7, and the PDF goes up as `<id>.pdf`. When the app does not know whether an upload reached the server, because the app was killed or the connection dropped mid-request, it asks first.
 
-It looks for a consume task with that file name, of any status, and follows it if one exists. Only then does it look for the document. In the other order, a task that finished between the two lookups would be missed by both. A proxy can still hand the request to Paperless after the phone has gone, so for two minutes after the send started, "nothing found" means "look again in 30 seconds", not "send again".
+It looks for a consume task with that file name, of any status, and follows it if one exists. Only then does it look for the document. In the other order, a task that finished between the two lookups would be missed by both. A proxy can still hand the request to Paperless after the phone has gone, so for two minutes after the app became unsure, when the send failed or when it found the job left in `sending` after a restart, "nothing found" means "look again in 30 seconds", not "send again".
 
 ```mermaid
 sequenceDiagram
@@ -172,10 +172,10 @@ sequenceDiagram
 		Queue->>Server: GET /api/documents/?original_filename__iexact=<id>.pdf
 		Server-->>Queue: document 42
 		Queue->>Queue: done
-	else nothing found within two minutes of the send
+	else nothing found within two minutes of becoming unsure
 		Queue->>Queue: look again in thirty seconds
 	else nothing found after that
-		Queue->>Server: send again
+		Queue->>Server: send again, after the retry delay
 	end
 ```
 
@@ -324,7 +324,7 @@ type UploadJob = {
 type UploadState =
 	| { kind: 'preparing' }
 	| { kind: 'waiting'; attempt: number; notBefore: number; maybeSent: false }
-	| { kind: 'waiting'; attempt: number; notBefore: number; maybeSent: true; startedAt: number }
+	| { kind: 'waiting'; attempt: number; notBefore: number; maybeSent: true; unsureSince: number }
 	| { kind: 'sending'; attempt: number; startedAt: number }
 	| { kind: 'processing'; taskId: TaskId; checks: number; failedChecks: number; nextCheckAt: number; startedAt: number }
 	| { kind: 'done'; documentId: DocumentId }
@@ -332,7 +332,7 @@ type UploadState =
 
 type ResumePoint =                 // where a job picks up after the user signs in again
 	| { step: 'send' }
-	| { step: 'reconcile'; startedAt: number }
+	| { step: 'reconcile'; unsureSince: number }
 	| { step: 'check'; taskId: TaskId; startedAt: number };
 
 type FailureReason =

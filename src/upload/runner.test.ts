@@ -67,8 +67,8 @@ const now = 1_000_000;
 const unauthorized = failure({ kind: 'unauthorized' } as const);
 
 describe('reconcile', () => {
-  const startedAt = now - 1000;
-  const unsure = jobIn({ kind: 'waiting', attempt: 1, notBefore: 0, maybeSent: true, startedAt }, '/file.pdf');
+  const unsureSince = now - 1000;
+  const unsure = jobIn({ kind: 'waiting', attempt: 1, notBefore: 0, maybeSent: true, unsureSince }, '/file.pdf');
 
   async function reconcileWith(client: Partial<UploadClient<string>>, job = unsure) {
     const next = await runStep(job, depsAt(now, await storing(job), { ...offlineClient, ...client }));
@@ -77,7 +77,7 @@ describe('reconcile', () => {
 
   test('follows a task that carries the file name, whatever its status', async () => {
     const state = await reconcileWith({ findConsumeTaskByFilename: async () => success(taskId) });
-    expect(state).toEqual({ kind: 'processing', taskId, checks: 0, failedChecks: 0, nextCheckAt: now, startedAt: now });
+    expect(state).toEqual({ kind: 'processing', taskId, checks: 0, failedChecks: 0, nextCheckAt: now, startedAt: unsureSince });
   });
 
   test('finishes on a document with the file name when no task has it', async () => {
@@ -93,12 +93,12 @@ describe('reconcile', () => {
       findConsumeTaskByFilename: async () => success(null),
       findDocumentByOriginalFilename: async () => success(null),
     });
-    expect(state).toEqual({ kind: 'waiting', attempt: 1, notBefore: now + 30_000, maybeSent: true, startedAt });
+    expect(state).toEqual({ kind: 'waiting', attempt: 1, notBefore: now + 30_000, maybeSent: true, unsureSince });
   });
 
-  test('sends again when nothing is found after the grace window', async () => {
+  test('sends again after a backoff when nothing is found after the grace window', async () => {
     const longAgo = jobIn(
-      { kind: 'waiting', attempt: 1, notBefore: 0, maybeSent: true, startedAt: now - sentGraceWindow },
+      { kind: 'waiting', attempt: 1, notBefore: 0, maybeSent: true, unsureSince: now - sentGraceWindow },
       '/file.pdf',
     );
     const state = await reconcileWith(
@@ -108,21 +108,21 @@ describe('reconcile', () => {
       },
       longAgo,
     );
-    expect(state).toEqual({ kind: 'waiting', attempt: 1, notBefore: now, maybeSent: false });
+    expect(state).toEqual({ kind: 'waiting', attempt: 1, notBefore: now + 10_000, maybeSent: false });
   });
 
   test('stays unsure and backs off when the server cannot be reached', async () => {
     const state = await reconcileWith({
       findConsumeTaskByFilename: async () => failure({ kind: 'timeout' }),
     });
-    expect(state).toEqual({ kind: 'waiting', attempt: 2, notBefore: now + 10_000, maybeSent: true, startedAt });
+    expect(state).toEqual({ kind: 'waiting', attempt: 2, notBefore: now + 10_000, maybeSent: true, unsureSince });
   });
 
   test('stops at sign-in and resumes the lookup, not the send, after a 401', async () => {
     const state = await reconcileWith({ findConsumeTaskByFilename: async () => unauthorized });
     expect(state).toEqual({
       kind: 'failed',
-      reason: { kind: 'sign_in_required', resume: { step: 'reconcile', startedAt } },
+      reason: { kind: 'sign_in_required', resume: { step: 'reconcile', unsureSince } },
     });
   });
 
@@ -133,7 +133,7 @@ describe('reconcile', () => {
     });
     expect(state).toEqual({
       kind: 'failed',
-      reason: { kind: 'not_permitted', resume: { step: 'reconcile', startedAt } },
+      reason: { kind: 'not_permitted', resume: { step: 'reconcile', unsureSince } },
     });
   });
 });
@@ -278,7 +278,7 @@ describe('recoverAfterRestart', () => {
 
     const recovered = await recoverAfterRestart(job, store, 10);
 
-    expect(recovered.state).toEqual({ kind: 'waiting', attempt: 1, notBefore: 10, maybeSent: true, startedAt: 0 });
+    expect(recovered.state).toEqual({ kind: 'waiting', attempt: 1, notBefore: 10, maybeSent: true, unsureSince: 10 });
     expect(await store.loadAll()).toEqual([recovered]);
   });
 });

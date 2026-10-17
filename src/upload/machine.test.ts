@@ -25,7 +25,8 @@ const now = 1_000_000;
 const earlier = now - 4000;
 const later = now + 4000;
 const startedAt = now - 1000;
-const startedLongAgo = now - sentGraceWindow;
+const unsureSince = now - 1000;
+const unsureLongAgo = now - sentGraceWindow;
 const taskId = 'task-1' as TaskId;
 const documentId = 42 as DocumentId;
 const offline: PaperlessError = { kind: 'network', message: 'offline' };
@@ -34,8 +35,8 @@ const states = {
   preparing: { kind: 'preparing' },
   waitingReady: { kind: 'waiting', attempt: 2, notBefore: earlier, maybeSent: false },
   waitingEarly: { kind: 'waiting', attempt: 2, notBefore: later, maybeSent: false },
-  waitingMaybeSent: { kind: 'waiting', attempt: 2, notBefore: earlier, maybeSent: true, startedAt },
-  waitingMaybeSentLongAgo: { kind: 'waiting', attempt: 2, notBefore: earlier, maybeSent: true, startedAt: startedLongAgo },
+  waitingMaybeSent: { kind: 'waiting', attempt: 2, notBefore: earlier, maybeSent: true, unsureSince },
+  waitingMaybeSentLongAgo: { kind: 'waiting', attempt: 2, notBefore: earlier, maybeSent: true, unsureSince: unsureLongAgo },
   sending: { kind: 'sending', attempt: 2, startedAt },
   processing: { kind: 'processing', taskId, checks: 3, failedChecks: 0, nextCheckAt: earlier, startedAt },
   processingUnanswered: {
@@ -48,9 +49,9 @@ const states = {
   },
   done: { kind: 'done', documentId },
   failedSignIn: { kind: 'failed', reason: { kind: 'sign_in_required', resume: { step: 'send' } } },
-  failedSignInReconcile: { kind: 'failed', reason: { kind: 'sign_in_required', resume: { step: 'reconcile', startedAt } } },
+  failedSignInReconcile: { kind: 'failed', reason: { kind: 'sign_in_required', resume: { step: 'reconcile', unsureSince } } },
   failedSignInCheck: { kind: 'failed', reason: { kind: 'sign_in_required', resume: { step: 'check', taskId, startedAt } } },
-  failedNotPermitted: { kind: 'failed', reason: { kind: 'not_permitted', resume: { step: 'reconcile', startedAt } } },
+  failedNotPermitted: { kind: 'failed', reason: { kind: 'not_permitted', resume: { step: 'reconcile', unsureSince } } },
   failedRejected: { kind: 'failed', reason: { kind: 'rejected', status: 413, message: 'too big' } },
   failedConsumption: { kind: 'failed', reason: { kind: 'consumption_failed', message: 'bad pdf' } },
   failedFileMissing: { kind: 'failed', reason: { kind: 'file_missing' } },
@@ -111,24 +112,24 @@ describe('transitions the table accepts', () => {
     ['waitingReady', events.fileMissing, { kind: 'failed', reason: { kind: 'file_missing' } }],
     ['waitingEarly', events.fileMissing, { kind: 'failed', reason: { kind: 'file_missing' } }],
     ['sending', events.sendAccepted, { kind: 'processing', taskId, checks: 0, failedChecks: 0, nextCheckAt: now + 2000, startedAt: now }],
-    ['sending', events.interrupted, { kind: 'waiting', attempt: 3, notBefore: now, maybeSent: true, startedAt }],
+    ['sending', events.interrupted, { kind: 'waiting', attempt: 3, notBefore: now, maybeSent: true, unsureSince: now }],
     ['waitingMaybeSent', events.foundDocument, { kind: 'done', documentId }],
-    ['waitingMaybeSent', events.foundTask, { kind: 'processing', taskId, checks: 0, failedChecks: 0, nextCheckAt: now, startedAt: now }],
-    ['waitingMaybeSent', events.notFound, { kind: 'waiting', attempt: 2, notBefore: now + 30_000, maybeSent: true, startedAt }],
-    ['waitingMaybeSentLongAgo', events.notFound, { kind: 'waiting', attempt: 2, notBefore: now, maybeSent: false }],
-    ['waitingMaybeSent', events.reconcileFailed, { kind: 'waiting', attempt: 3, notBefore: now + 20_000, maybeSent: true, startedAt }],
+    ['waitingMaybeSent', events.foundTask, { kind: 'processing', taskId, checks: 0, failedChecks: 0, nextCheckAt: now, startedAt: unsureSince }],
+    ['waitingMaybeSent', events.notFound, { kind: 'waiting', attempt: 2, notBefore: now + 30_000, maybeSent: true, unsureSince }],
+    ['waitingMaybeSentLongAgo', events.notFound, { kind: 'waiting', attempt: 2, notBefore: now + 20_000, maybeSent: false }],
+    ['waitingMaybeSent', events.reconcileFailed, { kind: 'waiting', attempt: 3, notBefore: now + 20_000, maybeSent: true, unsureSince }],
     ['processing', events.taskPending, { kind: 'processing', taskId, checks: 4, failedChecks: 0, nextCheckAt: now + 32_000, startedAt }],
     ['processing', events.taskUnknown, { kind: 'processing', taskId, checks: 4, failedChecks: 1, nextCheckAt: now + 32_000, startedAt }],
     ['processing', events.checkFailed, { kind: 'processing', taskId, checks: 4, failedChecks: 1, nextCheckAt: now + 32_000, startedAt }],
     ['processingUnanswered', events.taskPending, { kind: 'processing', taskId, checks: 13, failedChecks: 0, nextCheckAt: now + 60_000, startedAt }],
-    ['processingUnanswered', events.taskUnknown, { kind: 'waiting', attempt: 0, notBefore: now, maybeSent: true, startedAt }],
-    ['processingUnanswered', events.checkFailed, { kind: 'waiting', attempt: 0, notBefore: now, maybeSent: true, startedAt }],
+    ['processingUnanswered', events.taskUnknown, { kind: 'waiting', attempt: 0, notBefore: now, maybeSent: true, unsureSince: now }],
+    ['processingUnanswered', events.checkFailed, { kind: 'waiting', attempt: 0, notBefore: now, maybeSent: true, unsureSince: now }],
     ['processing', events.taskSucceeded, { kind: 'done', documentId }],
     ['processing', events.taskFailed, { kind: 'failed', reason: { kind: 'consumption_failed', message: 'bad pdf' } }],
     ['failedSignIn', events.signedIn, freshWait],
-    ['failedSignInReconcile', events.signedIn, { kind: 'waiting', attempt: 0, notBefore: now, maybeSent: true, startedAt }],
+    ['failedSignInReconcile', events.signedIn, { kind: 'waiting', attempt: 0, notBefore: now, maybeSent: true, unsureSince }],
     ['failedSignInCheck', events.signedIn, { kind: 'processing', taskId, checks: 0, failedChecks: 0, nextCheckAt: now, startedAt }],
-    ['failedNotPermitted', events.retryRequested, { kind: 'waiting', attempt: 0, notBefore: now, maybeSent: true, startedAt }],
+    ['failedNotPermitted', events.retryRequested, { kind: 'waiting', attempt: 0, notBefore: now, maybeSent: true, unsureSince }],
     ['failedRejected', events.retryRequested, freshWait],
     ['failedConsumption', events.retryRequested, freshWait],
   ])('%s + %o', (stateName, event, expected) => {
@@ -137,7 +138,7 @@ describe('transitions the table accepts', () => {
 });
 
 describe('a failed send', () => {
-  const retryMaybeSent: UploadState = { kind: 'waiting', attempt: 3, notBefore: now + 20_000, maybeSent: true, startedAt };
+  const retryMaybeSent: UploadState = { kind: 'waiting', attempt: 3, notBefore: now + 20_000, maybeSent: true, unsureSince: now };
 
   test.each<[PaperlessError, UploadState]>([
     [{ kind: 'network', message: 'offline' }, retryMaybeSent],
@@ -155,11 +156,29 @@ describe('a failed send', () => {
   ])('with %o', (error, expected) => {
     expect(transition(states.sending, { kind: 'sendFailed', error }, now)).toEqual(expected);
   });
+
+  test.each<UploadEvent>([events.sendFailed, events.interrupted])(
+    'that started long before %o still gets the grace recheck',
+    (event) => {
+      const longSend: UploadState = { kind: 'sending', attempt: 2, startedAt: now - 3 * sentGraceWindow };
+      const unsure = transition(longSend, event, now);
+      expect(unsure).toMatchObject({ kind: 'waiting', maybeSent: true, unsureSince: now });
+
+      const recheckAt = now + sendRetryDelay(2);
+      expect(transition(unsure, events.notFound, recheckAt)).toEqual({
+        kind: 'waiting',
+        attempt: 3,
+        notBefore: recheckAt + 30_000,
+        maybeSent: true,
+        unsureSince: now,
+      });
+    },
+  );
 });
 
 describe('a failed reconcile', () => {
-  const resume = { step: 'reconcile', startedAt } as const;
-  const retryMaybeSent: UploadState = { kind: 'waiting', attempt: 3, notBefore: now + 20_000, maybeSent: true, startedAt };
+  const resume = { step: 'reconcile', unsureSince } as const;
+  const retryMaybeSent: UploadState = { kind: 'waiting', attempt: 3, notBefore: now + 20_000, maybeSent: true, unsureSince };
 
   test.each<[PaperlessError, UploadState]>([
     [offline, retryMaybeSent],
