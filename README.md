@@ -37,22 +37,33 @@ Paperless-ngx sends its version headers only to a signed-in user, so the first c
 
 ## Build for Android
 
-`dev/android.sh` builds a release APK signed with the debug key and runs it on a headless emulator of its own, `waraq_pixel`, on console port 5560. It reads `JAVA_HOME` and `ANDROID_HOME` from the environment or from `.dev-data/toolchain.env`, which git does not track:
+`dev/android.sh` builds a release APK signed with the debug key and runs it on a headless emulator of its own, `waraq_pixel`. It reads `JAVA_HOME` and `ANDROID_HOME` from the environment or from `.dev-data/toolchain.env`, which git does not track:
 
 ```sh
 export JAVA_HOME=/path/to/jdk-17
 export ANDROID_HOME=/path/to/android-sdk
 ```
 
-Expo SDK 58 compiles against Android API 37, so the SDK needs `platforms;android-37` and `build-tools;37.0.0`. The app targets API 36.
+Expo SDK 58 compiles against Android API 37, so the SDK needs `platforms;android-37.0` and `build-tools;37.0.0`. The app targets API 36.
+
+The emulator talks only to an adb server of its own on port 5038. Its console and adb ports, 5600 and 5601, sit above 5585, the last port that adb servers scan for emulators. Another project's adb server on the default port 5037 never sees it, even when that server runs with a different key.
+
+```mermaid
+flowchart LR
+  script["dev/android.sh"] -->|"adb -P 5038"| own["adb server on 5038<br>key in .dev-data"]
+  own -->|"port 5601"| emulator["waraq_pixel<br>console 5600"]
+  other["adb server on 5037<br>scans 5555 to 5585 only"]
+```
 
 ```sh
 dev/android.sh build       # the APK, then its package, SDK levels, and permissions
 dev/android.sh boot
 dev/android.sh install
 dev/android.sh shot inbox  # .dev-data/shots/inbox.png
+dev/android.sh flow        # signs in to http://10.0.2.2:8010 in light, dark, and large text, and once with a wrong password
 dev/android.sh logs
-dev/android.sh stop
+dev/android.sh adb devices # any adb command, against port 5038
+dev/android.sh stop        # this emulator and its adb server only
 ```
 
 ## How an upload moves
