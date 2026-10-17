@@ -24,7 +24,8 @@ export function TabBar({ state, descriptors, emitter, navigateToTab, insets }: B
     >
       {state.routes.map((route, index) => {
         const focused = state.index === index;
-        const label = descriptors[route.key].options.title ?? route.name;
+        const options = descriptors[route.key].options;
+        const label = options.title ?? route.name;
         const onPress = () => {
           const event = emitter.emit({ type: 'tabPress', target: route.key, canPreventDefault: true });
           if (!focused && !event.defaultPrevented) {
@@ -35,13 +36,18 @@ export function TabBar({ state, descriptors, emitter, navigateToTab, insets }: B
           <Pressable
             key={route.key}
             accessibilityRole="tab"
-            accessibilityLabel={label}
+            accessibilityLabel={options.tabBarAccessibilityLabel ?? label}
             accessibilityState={{ selected: focused }}
             onPress={onPress}
             style={styles.item}
           >
             <View style={[styles.pill, focused && { backgroundColor: colors.accentSoft }]}>
               <Icon name={tabIcons[route.name]} color={focused ? colors.onAccentSoft : colors.inkMuted} />
+              {options.tabBarBadge !== undefined && (
+                <View style={[styles.count, { backgroundColor: colors.accent }]}>
+                  <Text style={[styles.countText, { color: colors.onAccent }]}>{options.tabBarBadge}</Text>
+                </View>
+              )}
             </View>
             <Text style={[styles.label, { color: focused ? colors.ink : colors.inkMuted }]}>{label}</Text>
           </Pressable>
@@ -56,4 +62,16 @@ const styles = StyleSheet.create({
   item: { flex: 1, minHeight: 56, alignItems: 'center', gap: 4 },
   pill: { width: 64, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
   label: { fontSize: 12.5, fontWeight: '500' },
+  count: {
+    position: 'absolute',
+    top: -4,
+    end: 6,
+    minWidth: 20,
+    height: 20,
+    paddingInline: 6,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  countText: { fontSize: 12, fontWeight: '600' },
 });

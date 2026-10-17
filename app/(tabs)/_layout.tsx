@@ -14,6 +14,8 @@ import { Icon } from '../../src/ui/Icon';
 import { Snackbar, SnackbarProvider, useSnackbarState } from '../../src/ui/Snackbar';
 import { TabBar, tabBarHeight } from '../../src/ui/TabBar';
 import { AccountId } from '../../src/upload/machine';
+import { useUploadQueue } from '../../src/upload/queue';
+import { unfinishedCount } from '../../src/upload/rows';
 
 const snackbarSpace = 76;
 
@@ -24,6 +26,8 @@ export default function TabsLayout() {
   const accountId = AccountId.parse(useSignedIn().account.id);
   const aboveTabs = tabBarHeight + insets.bottom;
   const showSnackbar = snackbar.show;
+  const { jobs } = useUploadQueue();
+  const unfinished = unfinishedCount(jobs, accountId);
 
   useEffect(() => {
     Scanner.prepare().catch(() => {});
@@ -78,7 +82,14 @@ export default function TabsLayout() {
         <Tabs tabBar={(props) => <TabBar {...props} />} screenOptions={{ headerShown: false }}>
           <Tabs.Screen name="index" options={{ title: copy.shell.inbox }} />
           <Tabs.Screen name="documents" options={{ title: copy.shell.documents }} />
-          <Tabs.Screen name="uploads" options={{ title: copy.shell.uploads }} />
+          <Tabs.Screen
+            name="uploads"
+            options={{
+              title: copy.shell.uploads,
+              tabBarBadge: unfinished > 0 ? unfinished : undefined,
+              tabBarAccessibilityLabel: unfinished > 0 ? copy.uploads.tabLabel(unfinished) : undefined,
+            }}
+          />
         </Tabs>
         <ScanButton bottom={aboveTabs + 20 + (snackbar.message === null ? 0 : snackbarSpace)} onPress={startScan} />
         <Snackbar message={snackbar.message} bottom={aboveTabs + 12} onHide={snackbar.hide} />
