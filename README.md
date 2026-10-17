@@ -12,9 +12,9 @@ Waraq needs Paperless-ngx 3.0 or newer. It talks to the REST API at version 10.
 - `src/account/` stores the one account. The address, user, and server version go in SQLite. The token and the custom header values go in the Android Keystore through expo-secure-store.
 - `src/documents/` turns the filter sheet and the server's saved views into list parameters, and works out which fields an edit changed. `src/inbox/` groups the inbox and removes a row when it is marked done. Both are plain TypeScript.
 - `src/cache/` names every TanStack Query key and saves the cache to SQLite. `src/files/` keeps opened documents in the cache folder.
-- `src/upload/` holds the upload job. Each scanned document becomes one job, and a table in `machine.ts` lists every state change the job allows. `runStep` in `runner.ts` is the only code in that folder that talks to the server or the disk.
 - `modules/scanner/` is a local Expo module in Kotlin. It opens Google's document scanner, writes PDFs, and brings in files picked on the phone or shared from other apps. It imports nothing from Waraq, so it can move into a package of its own.
 - `src/scan/` holds the batch being scanned. `batch.ts` has the data shapes and every edit as a plain function. `store.ts` keeps the batch in SQLite and its files in the app's files folder.
+- `src/upload/` holds the upload queue. Each scanned document becomes one job, and a table in `machine.ts` lists every state change the job allows. `runStep` in `runner.ts` takes one job one step. `store.ts` keeps the jobs in SQLite, `drain.ts` runs every job that is due, and `rows.ts` works out what the Uploads screen shows. These files are plain TypeScript, so the tests run them in Node. `queue.ts` connects them to the phone's database, files, account, and network, and `background.ts` runs the queue while the app is closed.
 - `src/copy.ts` holds every word the app shows. Screens take their text from it.
 - `plugins/network-security.ts` writes Android's network security config. It trusts certificate authorities that the user installed, and allows plain HTTP, which `normalizeServerUrl` then allows only for addresses on a home network or VPN.
 - `src/brand.json` holds the app name, slug, and Android package. Change them there.
@@ -22,6 +22,8 @@ Waraq needs Paperless-ngx 3.0 or newer. It talks to the REST API at version 10.
 Four libraries came in with the document screens. `@tanstack/react-query-persist-client` saves the query cache. `@react-native-community/datetimepicker` opens Android's date dialog. `expo-file-system` writes downloaded files and hands them to the phone's PDF app. `expo-sharing` opens the share sheet. None of them adds an Android permission.
 
 The scanner module adds one library, Google's `play-services-mlkit-document-scanner`. The scanner itself runs inside Play services, so the app gets no camera permission. Its checks on the emulator use `androidx.test`, which goes only into the test APK.
+
+Two libraries came in with the upload queue. `expo-background-task` asks Android's WorkManager to run the queue while the app is closed. `expo-task-manager` holds the code that WorkManager runs, under a task name.
 
 ## How sign-in works
 
@@ -137,7 +139,7 @@ flowchart LR
 stateDiagram-v2
     [*] --> preparing
     preparing --> waiting: prepared
-    preparing --> failed: prepareFailed
+    preparing --> failed: prepareFailed or fileMissing
     waiting --> sending: sendStarted
     waiting --> failed: fileMissing
     sending --> processing: sendAccepted
@@ -170,6 +172,59 @@ Three rules keep two copies of a job from sending the same file:
 - `recoverAfterRestart` runs once when the process starts, before any drain. It never runs from a background entry point while the process is alive, because a job found in `sending` then is being sent, not left behind.
 
 One known gap remains. If the user retries a job that Paperless could not consume, and that retry's request never reaches the server, the lookup finds the earlier failed task with the same file name and shows that failure again. Nothing is uploaded twice. The user sees the old error and can retry once more.
+
+### Where the jobs live
+
+Each job is one row of the table `upload_jobs` in the SQLite file `uploads.db`. The state, the upload fields, and the input pages are JSON columns that Zod parses on read. A row that does not parse shows on the Uploads screen as failed, with Delete and no Retry. The store never drops it.
+
+Each store rule is one SQL statement, so it holds between two JavaScript runtimes that share the file:
+
+- `insert` is `INSERT OR IGNORE`. It counts as written only when one row changed, so a batch queued twice makes each job once.
+- `saveIfUnchanged` is `UPDATE ... WHERE id = ? AND updated_at = ?`.
+- `deleteIfUnchanged` is `DELETE ... WHERE id = ? AND updated_at = ?`.
+
+The database runs in WAL mode and waits up to five seconds for a lock.
+
+### When the queue runs
+
+`drain.ts` runs the queue. A run loops `runStep` over every job that is due, until a pass changes nothing. It skips the jobs of an account that is not signed in, so those never send. At the end it sets one timer for the earliest retry or task check, at most 30 minutes ahead. A call while a run is going makes that run do one more pass. It never starts a second drain.
+
+These start a run:
+
+- the app starts with an account signed in
+- the app comes back to the screen
+- the network comes back
+- a batch is queued
+- the user signs in, which first moves the jobs of that account held at `sign_in_required`
+- the timer for the next retry or check
+- Android's WorkManager, about every 15 minutes while the app is closed
+
+When a run throws an error, `queue.ts` logs it and starts another run a minute later.
+
+```mermaid
+flowchart LR
+  subgraph app["App runtime"]
+    triggers["app start, back on screen,<br>network back, batch queued,<br>sign-in, timer"] --> appQueue["uploadQueue.run()"]
+    aliveTask["WorkManager task<br>while the app is alive"] --> appQueue
+  end
+  subgraph headless["Task runtime, app closed"]
+    closedTask["WorkManager task<br>about every 15 minutes"] --> taskQueue["a new uploadQueue,<br>recovers once"]
+  end
+  appQueue <--> database[("uploads.db<br>SQLite in WAL mode")]
+  taskQueue <--> database
+  appQueue -->|"XMLHttpRequest"| server["Paperless-ngx"]
+  taskQueue -->|"XMLHttpRequest"| server
+```
+
+`background.ts` defines the WorkManager task at module scope, as `expo-task-manager` asks. `index.ts`, the app's entry file, imports it before `expo-router/entry`, because Android starts the app with no screens to run the task, and expo-router loads a route file only when it renders. The task calls `run()` on the same queue object as the screens. `queue.ts` makes that object once per JavaScript runtime, and only its first run calls `recoverAfterRestart`. When WorkManager runs the task while the app is alive, the task runs in the app's runtime. That queue has already recovered, so it leaves a job in `sending` alone, because the app is sending it. When the app is closed, Android starts a new runtime with no screens. Its queue is new and recovers once. Nothing else in that process sends, so a job found in `sending` there was left behind. The test "recovers a job left in sending once per queue, and a new queue recovers again" in `drain.test.ts` checks both cases.
+
+### Files
+
+The queue writes the PDF to `uploads/<job id>.pdf` in the app's documents folder. A job that arrives as a ready PDF, shared from another app, skips that step. When a job leaves `preparing`, the queue deletes its page files, whether the PDF was made or not. It deletes the PDF when the job is done. A done job's row stays a week as history, then a run deletes it with `deleteIfUnchanged`. Delete on the Uploads screen removes the row and every file of the job.
+
+### The upload request
+
+The upload goes through React Native's `XMLHttpRequest`, not `expo/fetch`. `expo/fetch` reports no upload progress, and it reads a `FormData` body whole into memory, so a 20 MB PDF would sit in memory twice. `XMLHttpRequest` streams the file part from disk and reports how much it has sent. Both build their HTTP client with `OkHttpClientProvider.createClient`, so the network security config and the user's certificate authorities apply to both. The Paperless client sets the account's headers on each request either way. `xhrFetch.ts` passes progress on only when 250 milliseconds have gone by since the last report or the share sent has grown by one percent, so the Uploads screen does not redraw for every chunk.
 
 ## Run the tests
 
