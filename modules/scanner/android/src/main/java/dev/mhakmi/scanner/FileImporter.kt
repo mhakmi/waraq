@@ -106,8 +106,13 @@ class FileImporter(private val context: Context) {
   }
 
   private fun copy(uri: Uri, file: File) {
-    val input = context.contentResolver.openInputStream(uri) ?: throw IllegalStateException("Cannot open $uri")
-    input.use { source -> file.outputStream().use { target -> source.copyTo(target) } }
+    try {
+      val input = context.contentResolver.openInputStream(uri) ?: throw IllegalStateException("Cannot open $uri")
+      input.use { source -> file.outputStream().use { target -> source.copyTo(target) } }
+    } catch (error: Exception) {
+      file.delete()
+      throw error
+    }
   }
 
   private fun displayName(uri: Uri): String {

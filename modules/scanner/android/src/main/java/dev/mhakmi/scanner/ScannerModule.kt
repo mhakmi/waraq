@@ -1,6 +1,7 @@
 package dev.mhakmi.scanner
 
 import android.app.Activity
+import android.content.ActivityNotFoundException
 import android.content.Intent
 import android.content.IntentSender
 import android.net.Uri
@@ -142,7 +143,11 @@ class ScannerModule : Module() {
         putExtra(Intent.EXTRA_MIME_TYPES, arrayOf("application/pdf", "image/*"))
         putExtra(Intent.EXTRA_ALLOW_MULTIPLE, true)
       }
-      activity.startActivityForResult(intent, pickRequest)
+      try {
+        activity.startActivityForResult(intent, pickRequest)
+      } catch (error: ActivityNotFoundException) {
+        failWaiting(ScanFailedException("This phone has no file picker", error))
+      }
     }.runOnQueue(Queues.MAIN)
 
     AsyncFunction("takeSharedFiles") Coroutine { directory: String ->
@@ -208,22 +213,24 @@ class ScannerModule : Module() {
       return
     }
     appContext.backgroundCoroutineScope.launch {
+      val sources = pages.map { page -> File(requireNotNull(page.imageUri.path)) }
+      val copies = mutableListOf<File>()
       try {
         current.directory.mkdirs()
-        current.promise.resolve(pages.map { page -> moveScannedPage(page.imageUri, current.directory) })
+        val saved = sources.map { source ->
+          val copy = File(current.directory, "${UUID.randomUUID()}.jpg")
+          copies.add(copy)
+          source.copyTo(copy)
+          val size = uprightSize(copy) ?: throw DecodeFailedException(copy.path)
+          mapOf("uri" to Uri.fromFile(copy).toString(), "width" to size.first, "height" to size.second)
+        }
+        sources.forEach { source -> source.delete() }
+        current.promise.resolve(saved)
       } catch (error: Exception) {
+        copies.forEach { copy -> copy.delete() }
         current.promise.reject(ScanFailedException("The scanned pages could not be saved", error))
       }
     }
-  }
-
-  private fun moveScannedPage(uri: Uri, directory: File): Map<String, Any> {
-    val source = File(requireNotNull(uri.path))
-    val target = File(directory, "${UUID.randomUUID()}.jpg")
-    source.copyTo(target)
-    source.delete()
-    val size = uprightSize(target) ?: throw DecodeFailedException(target.path)
-    return mapOf("uri" to Uri.fromFile(target).toString(), "width" to size.first, "height" to size.second)
   }
 
   private fun finishPick(current: Waiting, resultCode: Int, data: Intent?) {
@@ -234,7 +241,11 @@ class ScannerModule : Module() {
     val clips = data.clipData?.let { clip -> (0 until clip.itemCount).map { index -> clip.getItemAt(index).uri } }
     val uris = clips ?: listOfNotNull(data.data)
     appContext.backgroundCoroutineScope.launch {
-      current.promise.resolve(FileImporter(context).import(uris, current.directory))
+      try {
+        current.promise.resolve(FileImporter(context).import(uris, current.directory))
+      } catch (error: Exception) {
+        current.promise.reject(ScanFailedException("The picked files could not be read", error))
+      }
     }
   }
 
@@ -242,6 +253,9 @@ class ScannerModule : Module() {
     val activity = appContext.currentActivity
     val intent = sharedIntent ?: activity?.intent ?: return emptyList()
     sharedIntent = null
+    if (intent.flags and Intent.FLAG_ACTIVITY_LAUNCHED_FROM_HISTORY != 0) {
+      return emptyList()
+    }
     val uris = sharedUris(intent)
     if (uris.isNotEmpty() && activity != null && activity.intent === intent) {
       activity.intent = Intent(Intent.ACTION_MAIN)

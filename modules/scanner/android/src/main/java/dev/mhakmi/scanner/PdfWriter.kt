@@ -59,9 +59,9 @@ fun exifRotation(file: File): Int {
     ExifInterface.ORIENTATION_NORMAL
   }
   return when (orientation) {
-    ExifInterface.ORIENTATION_ROTATE_90 -> 90
+    ExifInterface.ORIENTATION_ROTATE_90, ExifInterface.ORIENTATION_TRANSPOSE -> 90
     ExifInterface.ORIENTATION_ROTATE_180 -> 180
-    ExifInterface.ORIENTATION_ROTATE_270 -> 270
+    ExifInterface.ORIENTATION_ROTATE_270, ExifInterface.ORIENTATION_TRANSVERSE -> 270
     else -> 0
   }
 }
@@ -87,14 +87,17 @@ fun jpegHeader(file: File): JpegHeader? {
           return null
         }
         val length = input.readUnsignedShort()
+        if (length < 2) {
+          return null
+        }
         if (marker in 0xC0..0xCF && marker != 0xC4 && marker != 0xC8 && marker != 0xCC) {
-          if (marker !in baselineOrProgressive) {
-            return null
-          }
-          input.readUnsignedByte()
+          val precision = input.readUnsignedByte()
           val height = input.readUnsignedShort()
           val width = input.readUnsignedShort()
           val components = input.readUnsignedByte()
+          if (marker !in baselineOrProgressive || precision != 8 || width == 0 || height == 0) {
+            return null
+          }
           return JpegHeader(width, height, components)
         }
         input.readFully(ByteArray(length - 2))
@@ -157,18 +160,19 @@ object PdfWriter {
   fun write(pages: List<PageSource>, output: File): PdfSummary {
     require(pages.isNotEmpty()) { "A PDF needs at least one page" }
     val partial = File(output.parentFile, "${output.name}.part")
+    var moved = false
     try {
       CountingStream(FileOutputStream(partial).buffered()).use { stream -> writeDocument(stream, pages) }
+      moved = partial.renameTo(output)
+      if (!moved) {
+        throw IOException("Could not move the PDF to ${output.path}")
+      }
     } catch (error: IOException) {
-      partial.delete()
       throw if (isOutOfSpace(error)) OutOfSpaceException(error) else error
-    } catch (error: Exception) {
-      partial.delete()
-      throw error
-    }
-    if (!partial.renameTo(output)) {
-      partial.delete()
-      throw IOException("Could not move the PDF to ${output.path}")
+    } finally {
+      if (!moved) {
+        partial.delete()
+      }
     }
     return PdfSummary(pages.size, output.length())
   }
