@@ -7,6 +7,7 @@
 #   dev/android.sh install       install the APK on the emulator
 #   dev/android.sh shot <name>   save a screenshot as .dev-data/shots/<name>.png
 #   dev/android.sh flow          sign in, search, edit a title, and mark a document done, then the key screens in dark and large text
+#   dev/android.sh pdf-check     run the PDF writer's checks on the emulator, then open its 10-page PDF on the Mac
 #   dev/android.sh logs          print the app's log lines
 #   dev/android.sh adb <args>    run adb against this project's own adb server
 #   dev/android.sh stop          stop this emulator and its adb server, and nothing else
@@ -423,6 +424,26 @@ flow() {
   echo "flow passed, screenshots in $SHOTS"
 }
 
+pdf_check() {
+  cd "$ROOT/android"
+  ./gradlew :scanner:assembleDebugAndroidTest \
+    -Pandroid.builder.sdkDownload=false \
+    --console=plain > "$LOGS/pdf-check-build.log" 2>&1 || {
+    echo "the test build failed, see $LOGS/pdf-check-build.log" >&2
+    grep -A 6 'What went wrong' "$LOGS/pdf-check-build.log" >&2
+    return 1
+  }
+  adb install -r "$ROOT/modules/scanner/android/build/outputs/apk/androidTest/debug/scanner-debug-androidTest.apk" > /dev/null
+  adb logcat -c
+  local result
+  result=$(adb shell am instrument -w dev.mhakmi.scanner.test/androidx.test.runner.AndroidJUnitRunner | tr -d '\r')
+  echo "$result"
+  adb logcat -d -s PdfWriterTest:I | grep PdfWriterTest || true
+  adb exec-out run-as dev.mhakmi.scanner.test cat files/pdf-check/ten-pages.pdf > "$DATA/ten-pages.pdf"
+  swift "$ROOT/dev/pdf-pages.swift" "$DATA/ten-pages.pdf"
+  echo "$result" | grep -q '^OK '
+}
+
 logs() {
   adb logcat -d -v time | grep -E "ReactNativeJS|AndroidRuntime|$APP_ID" || true
 }
@@ -435,6 +456,9 @@ stop() {
 case "${1:-}" in
   build | badging | boot | install | flow | logs | stop)
     "$1"
+    ;;
+  pdf-check)
+    pdf_check
     ;;
   adb)
     shift
