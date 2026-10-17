@@ -7,7 +7,33 @@ Waraq needs Paperless-ngx 3.0 or newer. It talks to the REST API at version 10.
 ## Code layout
 
 - `src/paperless/` is the API client. It uses the `fetch` it is given, and parses every response with Zod before the rest of the app sees it. Zod is the one dependency added for that.
+- `src/upload/` holds the upload job. Each scanned document becomes one job, and a table in `machine.ts` lists every state change the job allows.
 - `src/brand.json` holds the app name, slug, and Android package. Change them there.
+
+## How an upload moves
+
+```mermaid
+stateDiagram-v2
+    [*] --> preparing
+    preparing --> waiting: prepared
+    preparing --> failed: prepareFailed
+    waiting --> sending: sendStarted
+    waiting --> failed: fileMissing
+    sending --> processing: sendAccepted
+    sending --> waiting: sendFailed, retry later
+    sending --> failed: sendFailed, 4xx
+    sending --> waiting: interrupted, maybe sent
+    waiting --> done: foundDocument
+    waiting --> processing: foundTask
+    waiting --> waiting: notFound or reconcileFailed
+    processing --> processing: taskPending or checkFailed
+    processing --> done: taskSucceeded
+    processing --> failed: taskFailed
+    failed --> waiting: signedIn or retryRequested
+    done --> [*]
+```
+
+The file goes up as `<job id>.pdf`. Paperless-ngx accepts the same file twice, so the app never sends a file again just because it is unsure. If a send may have reached the server, for example after a timeout or an app crash, the job looks for a task or a document with that file name first. It sends again only when neither exists.
 
 ## Run the tests
 
