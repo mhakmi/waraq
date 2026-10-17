@@ -55,6 +55,7 @@ function Screens() {
         <Stack.Screen name="(tabs)" />
         <Stack.Screen name="scan/index" />
         <Stack.Screen name="scan/pages/[id]" />
+        <Stack.Screen name="scan/details" />
         <Stack.Screen name="document/[id]/index" />
         <Stack.Screen name="document/[id]/edit" />
       </Stack.Protected>
