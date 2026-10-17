@@ -67,6 +67,11 @@ async function clientFor(accountId: AccountId, onProgress: (progress: Progress) 
   if (stored === null || stored.account.id !== accountId) {
     return null;
   }
+  // Nothing leaves the phone while it is offline, so a job waits rather than failing a send
+  // and then looking for an upload that never happened.
+  if ((await NetInfo.fetch()).isConnected === false) {
+    return null;
+  }
   return createPaperlessClient<UploadFile>({
     baseUrl: stored.account.serverUrl,
     auth: { kind: 'token', token: stored.secrets.token },

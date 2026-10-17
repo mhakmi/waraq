@@ -64,7 +64,7 @@ export function rowLook(
   const state = job.state;
   switch (state.kind) {
     case 'preparing':
-      return { kind: 'preparing' };
+      return online ? { kind: 'preparing' } : { kind: 'waitingOffline' };
     case 'waiting':
       if (!online) {
         return { kind: 'waitingOffline' };

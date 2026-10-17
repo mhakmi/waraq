@@ -221,7 +221,7 @@ stateDiagram-v2
 
 ### When uploads run
 
-React Native runs JavaScript only while Android lets the app run. The queue drains when the app starts, when it returns to the screen, and when the network comes back. `expo-background-task` runs it through Android's WorkManager when the app is closed, at most every 15 minutes and at a time Android chooses. The Uploads screen says so in plain words.
+React Native runs JavaScript only while Android lets the app run. The queue drains when the app starts, when it returns to the screen, and when the network comes back. While the phone is offline, no job takes a step. `expo-background-task` runs it through Android's WorkManager when the app is closed, at most every 15 minutes and at a time Android chooses. The Uploads screen says so in plain words.
 
 A foreground service would upload faster after the app is closed. On Android 15 it is capped at 6 hours a day, and Play asks for a declaration with a video. The first release does without it. If testers leave large batches waiting too long, Android's user-initiated transfer job is the next step. It needs a small native module.
 

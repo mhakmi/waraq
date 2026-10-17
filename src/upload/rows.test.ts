@@ -44,6 +44,7 @@ describe('rowLook', () => {
 
   test.each<[string, UploadState, boolean, RowLook]>([
     ['preparing', { kind: 'preparing' }, true, { kind: 'preparing' }],
+    ['preparing offline, since no step runs until the phone is back online', { kind: 'preparing' }, false, { kind: 'waitingOffline' }],
     ['waiting offline', { kind: 'waiting', attempt: 2, notBefore: 500, maybeSent: false }, false, { kind: 'waitingOffline' }],
     [
       'waiting offline after a send that may have landed',
