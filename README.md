@@ -6,9 +6,54 @@ Waraq needs Paperless-ngx 3.0 or newer. It talks to the REST API at version 10.
 
 ## Code layout
 
+- `app/` holds the screens, one file per route, for expo-router. `(tabs)/` is Inbox, Documents, and Uploads. `sign-in/` is shown only while no account is stored.
 - `src/paperless/` is the API client. It uses the `fetch` it is given, and parses every response with Zod before the rest of the app sees it. Zod is the one dependency added for that.
+- `src/signin/` holds the sign-in steps and the checklist that a failed sign-in shows. It is plain TypeScript, so the tests run it in Node.
+- `src/account/` stores the one account. The address, user, and server version go in SQLite. The token and the custom header values go in the Android Keystore through expo-secure-store.
 - `src/upload/` holds the upload job. Each scanned document becomes one job, and a table in `machine.ts` lists every state change the job allows. `runStep` in `runner.ts` is the only code in that folder that talks to the server or the disk.
+- `src/copy.ts` holds every word the app shows. Screens take their text from it.
+- `plugins/network-security.ts` writes Android's network security config. It trusts certificate authorities that the user installed, and allows plain HTTP, which `normalizeServerUrl` then allows only for addresses on a home network or VPN.
 - `src/brand.json` holds the app name, slug, and Android package. Change them there.
+
+## How sign-in works
+
+```mermaid
+flowchart TD
+    Address["Server address<br/>and custom headers"] --> Parse{"normalizeServerUrl"}
+    Parse -- "http to a public host" --> Failed
+    Parse -- "cannot be read" --> Address
+    Parse --> Probe["OPTIONS /api/token/<br/>Accept: version=10<br/>no sign-in needed"]
+    Probe -- "names the Paperless token view" --> Credentials["Username and password,<br/>or an API token"]
+    Probe -- "no answer, TLS error, web page, 406" --> Failed["Checklist<br/>with the cause and the fix"]
+    Credentials --> Token["POST /api/token/"]
+    Token -- "MFA code is required" --> Credentials
+    Token --> Version["GET /api/ui_settings/<br/>read X-Version and X-Api-Version"]
+    Version -- "API version below 10" --> Failed
+    Version --> Inbox["Inbox"]
+    Token -- "wrong password, throttled" --> Failed
+```
+
+Paperless-ngx sends its version headers only to a signed-in user, so the first check needs another signal. `OPTIONS /api/token/` needs no sign-in, and Paperless-ngx 3.x answers it with JSON that names its token view, "Paperless Obtain Auth Token". A server that cannot speak API version 10 answers 406. The version is read after sign-in. The probe counts against the same limit as the token request, five a minute.
+
+## Build for Android
+
+`dev/android.sh` builds a release APK signed with the debug key and runs it on a headless emulator of its own, `waraq_pixel`, on console port 5560. It reads `JAVA_HOME` and `ANDROID_HOME` from the environment or from `.dev-data/toolchain.env`, which git does not track:
+
+```sh
+export JAVA_HOME=/path/to/jdk-17
+export ANDROID_HOME=/path/to/android-sdk
+```
+
+Expo SDK 58 compiles against Android API 37, so the SDK needs `platforms;android-37` and `build-tools;37.0.0`. The app targets API 36.
+
+```sh
+dev/android.sh build       # the APK, then its package, SDK levels, and permissions
+dev/android.sh boot
+dev/android.sh install
+dev/android.sh shot inbox  # .dev-data/shots/inbox.png
+dev/android.sh logs
+dev/android.sh stop
+```
 
 ## How an upload moves
 
