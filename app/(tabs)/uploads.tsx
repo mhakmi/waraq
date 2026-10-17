@@ -1,23 +1,29 @@
+import { useQuery } from '@tanstack/react-query';
 import { File } from 'expo-file-system';
+import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { type ReactNode, useEffect, useState } from 'react';
 import { Alert, SectionList, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { queryKeys, thumbnailCacheKey } from '../../src/cache/keys';
 import { copy } from '../../src/copy';
-import { useOnline } from '../../src/query';
-import { useSignedIn } from '../../src/session';
+import type { DocumentId } from '../../src/paperless/schemas';
+import { unwrap, useOnline } from '../../src/query';
+import { useClient, useSignedIn } from '../../src/session';
 import { type Colors, useColors } from '../../src/theme';
 import { AccountButton } from '../../src/ui/AccountButton';
 import { Button } from '../../src/ui/Button';
 import { Icon, type IconName } from '../../src/ui/Icon';
 import { Message } from '../../src/ui/Message';
 import type { Progress } from '../../src/upload/drain';
-import type { UploadJob } from '../../src/upload/machine';
+import { type PageImage, previewImage, type UploadJob } from '../../src/upload/machine';
 import { reportUploadError, uploadQueue, useUploadQueue } from '../../src/upload/queue';
 import { type RowLook, type UploadRow, uploadSections } from '../../src/upload/rows';
 
 const minute = 60_000;
+const thumbWidth = 40;
+const thumbHeight = 53;
 
 type StateLine = { text: string; icon: IconName; tone: 'muted' | 'accent' | 'success' | 'danger' };
 
@@ -98,8 +104,8 @@ function useMinuteClock(): number {
   return now;
 }
 
-function confirmDelete(job: UploadJob) {
-  Alert.alert(copy.uploads.deleteTitle, copy.uploads.deleteMessage(job.fields.title), [
+function confirmDelete(job: UploadJob, title: string) {
+  Alert.alert(copy.uploads.deleteTitle, copy.uploads.deleteMessage(title), [
     { text: copy.uploads.cancel, style: 'cancel' },
     {
       text: copy.uploads.delete,
@@ -124,6 +130,7 @@ export default function UploadsScreen() {
     progress: snapshot.progress,
     fileBytes,
   }).map((section) => ({ ...section, data: section.rows }));
+  const openDocument = (documentId: number) => router.push(`/document/${documentId}`);
 
   return (
     <SafeAreaView edges={['top']} style={[styles.fill, { backgroundColor: colors.surface }]}>
@@ -142,14 +149,13 @@ export default function UploadsScreen() {
       <SectionList
         sections={sections}
         keyExtractor={(row) => row.job.id}
-        renderItem={({ item, index }) => (
-          <UploadRowView
-            row={item}
-            divided={index > 0}
-            now={now}
-            onOpen={(documentId) => router.push(`/document/${documentId}`)}
-          />
-        )}
+        renderItem={({ item, index }) => {
+          const shared = { row: item, divided: index > 0, now, onOpen: openDocument };
+          if (item.look.kind === 'done') {
+            return <DoneUploadRow {...shared} documentId={item.look.documentId} />;
+          }
+          return <UploadRowView {...shared} title={item.job.fields.title} thumbnail={<PageThumbnail page={previewImage(item.job.input)} />} />;
+        }}
         renderSectionHeader={({ section }) => (
           <Text accessibilityRole="header" style={[styles.groupHead, { color: colors.inkMuted }]}>
             {copy.uploads.sectionHeading(copy.uploads.batchHeading(section.createdAt, now), section.rows.length)}
@@ -168,20 +174,78 @@ export default function UploadsScreen() {
 
 type UploadRowViewProps = {
   row: UploadRow;
+  title: string;
+  thumbnail: ReactNode;
   divided: boolean;
   now: number;
   onOpen: (documentId: number) => void;
 };
 
-function UploadRowView({ row, divided, now, onOpen }: UploadRowViewProps) {
+function DoneUploadRow({ documentId, ...props }: Omit<UploadRowViewProps, 'title' | 'thumbnail'> & { documentId: DocumentId }) {
+  const client = useClient();
+  const { account } = useSignedIn();
+  const uploaded = useQuery({
+    queryKey: queryKeys.document(account.id, documentId),
+    queryFn: () => unwrap(client.getDocument(documentId)),
+  });
+  const document = uploaded.data;
+  if (document === undefined) {
+    return <UploadRowView {...props} title={props.row.job.fields.title} thumbnail={<PageThumbnail page={null} />} />;
+  }
+  const thumbnail = client.documentFile(document.id, 'thumb');
+  return (
+    <UploadRowView
+      {...props}
+      title={document.title}
+      thumbnail={
+        <ThumbnailBox>
+          <Image
+            source={{
+              uri: thumbnail.url,
+              headers: thumbnail.headers,
+              cacheKey: thumbnailCacheKey(account.serverUrl, document.id, document.modified),
+            }}
+            contentFit="cover"
+            contentPosition="top"
+            accessible={false}
+            style={styles.thumbImage}
+          />
+        </ThumbnailBox>
+      }
+    />
+  );
+}
+
+function ThumbnailBox({ children }: { children?: ReactNode }) {
+  const colors = useColors();
+  return <View style={[styles.thumb, { backgroundColor: colors.paper, borderColor: colors.line }]}>{children}</View>;
+}
+
+function PageThumbnail({ page }: { page: PageImage | null }) {
+  if (page === null) {
+    return <ThumbnailBox />;
+  }
+  const sideways = page.rotation === 90 || page.rotation === 270;
+  return (
+    <ThumbnailBox>
+      <Image
+        source={{ uri: page.uri }}
+        contentFit="cover"
+        accessible={false}
+        style={[sideways ? styles.thumbImageSideways : styles.thumbImage, { transform: [{ rotate: `${page.rotation}deg` }] }]}
+      />
+    </ThumbnailBox>
+  );
+}
+
+function UploadRowView({ row, title, thumbnail, divided, now, onOpen }: UploadRowViewProps) {
   const colors = useColors();
   const { job, look } = row;
   const line = stateLine(look, now);
   const reason = reasonText(look);
-  const title = job.fields.title;
   return (
     <View style={[styles.row, divided && { borderTopWidth: 1, borderTopColor: colors.line }]}>
-      <View style={[styles.thumb, { backgroundColor: colors.paper, borderColor: colors.line }]} />
+      {thumbnail}
       <View style={styles.main}>
         <Text style={[styles.rowTitle, { color: colors.ink }]}>{title}</Text>
         <View style={styles.state}>
@@ -219,7 +283,7 @@ function UploadRowView({ row, divided, now, onOpen }: UploadRowViewProps) {
                 icon="trash"
                 variant="outline"
                 compact
-                onPress={() => confirmDelete(job)}
+                onPress={() => confirmDelete(job, title)}
               />
             )}
           </View>
@@ -258,7 +322,17 @@ const styles = StyleSheet.create({
   bannerText: { flex: 1, fontSize: 14 },
   groupHead: { paddingBlockStart: 16, paddingBlockEnd: 6, paddingInline: 20, fontSize: 13.5, fontWeight: '600' },
   row: { flexDirection: 'row', alignItems: 'flex-start', gap: 14, paddingBlock: 12, paddingInlineStart: 20, paddingInlineEnd: 12 },
-  thumb: { width: 40, height: 53, borderRadius: 3, borderWidth: StyleSheet.hairlineWidth },
+  thumb: {
+    width: thumbWidth,
+    height: thumbHeight,
+    borderRadius: 3,
+    borderWidth: StyleSheet.hairlineWidth,
+    overflow: 'hidden',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  thumbImage: { width: thumbWidth, height: thumbHeight },
+  thumbImageSideways: { width: thumbHeight, height: thumbWidth },
   main: { flex: 1, minWidth: 0, gap: 4 },
   rowTitle: { fontSize: 15.5, fontWeight: '500' },
   state: { flexDirection: 'row', alignItems: 'center', gap: 6 },
