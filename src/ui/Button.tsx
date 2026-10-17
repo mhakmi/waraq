@@ -13,6 +13,8 @@ type ButtonProps = {
   icon?: IconName;
   busy?: boolean;
   disabled?: boolean;
+  compact?: boolean;
+  accessibilityLabel?: string;
 };
 
 function variantColors(variant: Variant, colors: Colors) {
@@ -28,20 +30,31 @@ function variantColors(variant: Variant, colors: Colors) {
   }
 }
 
-export function Button({ label, onPress, variant = 'primary', large = false, icon, busy = false, disabled = false }: ButtonProps) {
+export function Button({
+  label,
+  onPress,
+  variant = 'primary',
+  large = false,
+  icon,
+  busy = false,
+  disabled = false,
+  compact = false,
+  accessibilityLabel,
+}: ButtonProps) {
   const colors = useColors();
   const look = variantColors(variant, colors);
   const inactive = disabled || busy;
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={label}
+      accessibilityLabel={accessibilityLabel ?? label}
       accessibilityState={{ disabled: inactive, busy }}
       disabled={inactive}
       onPress={onPress}
       style={({ pressed }) => [
         styles.button,
         large && styles.large,
+        compact && styles.compact,
         { backgroundColor: look.background, borderColor: look.border, opacity: pressed || disabled ? 0.7 : 1 },
       ]}
     >
@@ -65,6 +78,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   large: { minHeight: 56 },
+  compact: { paddingInline: 14 },
   label: { fontSize: 15, fontWeight: '500', textAlign: 'center', flexShrink: 1 },
   largeLabel: { fontSize: 16 },
   link: { textDecorationLine: 'underline' },

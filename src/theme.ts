@@ -18,6 +18,10 @@ const light = {
   warning: '#7d5200',
   warningSoft: '#f4e6c6',
   paper: '#ffffff',
+  scrim: 'rgba(20, 24, 32, 0.45)',
+  snackbar: '#262b36',
+  onSnackbar: '#f2efe8',
+  snackbarAction: '#b5c9ef',
 };
 
 export type Colors = typeof light;
@@ -40,6 +44,10 @@ const dark: Colors = {
   warning: '#e8c47a',
   warningSoft: '#3c3018',
   paper: '#e6e2da',
+  scrim: 'rgba(0, 0, 0, 0.6)',
+  snackbar: '#e6e2da',
+  onSnackbar: '#1c2230',
+  snackbarAction: '#1f3b6e',
 };
 
 export function useColors(): Colors {

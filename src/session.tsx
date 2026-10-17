@@ -2,6 +2,7 @@ import { fetch } from 'expo/fetch';
 import { createContext, type ReactNode, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 
 import { clearAccount, loadAccount, saveAccount } from './account/store';
+import { queryPersister } from './cache/persister';
 import type { StoredAccount } from './account/types';
 import { createPaperlessClient, type PaperlessClient } from './paperless/client';
 import { queryClient } from './query';
@@ -42,6 +43,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       await clearAccount(state.stored.account.id);
     }
     queryClient.clear();
+    await queryPersister.removeClient();
     setState({ kind: 'signedOut' });
   }, [state]);
 

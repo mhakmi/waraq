@@ -1,25 +1,39 @@
-import { QueryClientProvider } from '@tanstack/react-query';
+import type { Query } from '@tanstack/react-query';
+import { PersistQueryClientProvider } from '@tanstack/react-query-persist-client';
+import Constants from 'expo-constants';
 import { type ErrorBoundaryProps } from 'expo-router';
 import { Stack } from 'expo-router/stack';
 import { useEffect } from 'react';
 import { StatusBar, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { shouldPersist } from '../src/cache/keys';
+import { queryPersister } from '../src/cache/persister';
 import { copy } from '../src/copy';
-import { connectQueriesToDevice, queryClient } from '../src/query';
+import { connectQueriesToDevice, queryClient, savedForMs } from '../src/query';
 import { SessionProvider, useSession } from '../src/session';
 import { useColors, useIsDark } from '../src/theme';
 import { Button } from '../src/ui/Button';
 
+const persistOptions = {
+  persister: queryPersister,
+  maxAge: savedForMs,
+  buster: Constants.expoConfig?.version ?? '',
+  dehydrateOptions: {
+    shouldDehydrateQuery: (query: Query) =>
+      query.state.status === 'success' && shouldPersist(query.queryKey),
+  },
+};
+
 export default function RootLayout() {
   useEffect(connectQueriesToDevice, []);
   return (
-    <QueryClientProvider client={queryClient}>
+    <PersistQueryClientProvider client={queryClient} persistOptions={persistOptions}>
       <SessionProvider>
         <SystemBars />
         <Screens />
       </SessionProvider>
-    </QueryClientProvider>
+    </PersistQueryClientProvider>
   );
 }
 
