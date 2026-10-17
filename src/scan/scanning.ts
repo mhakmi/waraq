@@ -1,6 +1,6 @@
 import * as Scanner from '../../modules/scanner';
 import { copy } from '../copy';
-import type { AccountId } from '../upload/machine';
+import type { AccountId } from '../account/id';
 import type { ScannedPage } from './batch';
 import { addImportedFiles, batchFolderUri, loadBatch, pagesFromScan } from './store';
 

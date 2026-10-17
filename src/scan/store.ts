@@ -3,7 +3,8 @@ import Storage from 'expo-sqlite/kv-store';
 import { useSyncExternalStore } from 'react';
 
 import type { ImportedFile, ScannedImage } from '../../modules/scanner';
-import { type AccountId, BatchId, JobId } from '../upload/machine';
+import type { AccountId } from '../account/id';
+import { BatchId, JobId } from '../upload/machine';
 import { uuidV7 } from '../upload/uuid';
 import {
   addDocument,

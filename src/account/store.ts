@@ -3,7 +3,8 @@ import Storage from 'expo-sqlite/kv-store';
 import { z } from 'zod';
 
 import { normalizeServerUrl } from '../paperless/url';
-import type { AccountId, ServerAccount, StoredAccount } from './types';
+import { type AccountId, accountIdFor } from './id';
+import type { ServerAccount, StoredAccount } from './types';
 
 const accountKey = 'account';
 
@@ -62,7 +63,17 @@ export async function loadAccount(): Promise<StoredAccount | null> {
     return null;
   }
   const headerValues = HeaderValues.safeParse(readJson(await SecureStore.getItemAsync(headersKey(account.id))));
-  return { account, secrets: { token, headerValues: headerValues.success ? headerValues.data : {} } };
+  const stored: StoredAccount = { account, secrets: { token, headerValues: headerValues.success ? headerValues.data : {} } };
+  return account.id === accountIdFor(account.serverUrl, account.username) ? stored : moveToDerivedId(stored);
+}
+
+// Earlier builds made a random id. It moves here, before any job can be made under it.
+async function moveToDerivedId({ account, secrets }: StoredAccount): Promise<StoredAccount> {
+  const moved: StoredAccount = { account: { ...account, id: accountIdFor(account.serverUrl, account.username) }, secrets };
+  await saveAccount(moved);
+  await SecureStore.deleteItemAsync(tokenKey(account.id));
+  await SecureStore.deleteItemAsync(headersKey(account.id));
+  return moved;
 }
 
 export async function saveAccount({ account, secrets }: StoredAccount): Promise<void> {

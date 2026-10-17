@@ -11,7 +11,7 @@ import { describeError, failure, type Result, success } from '../paperless/error
 import type { Batch } from '../scan/batch';
 import { createUploadQueue, type Progress, type QueueSnapshot } from './drain';
 import { expoDatabase } from './expoDatabase';
-import { AccountId, type UploadJob } from './machine';
+import type { AccountId, UploadJob } from './machine';
 import type { JobStore, PdfBuildFailure } from './runner';
 import { openJobStore } from './store';
 import { xhrFetch } from './xhrFetch';
@@ -56,7 +56,7 @@ export function accountChanged(): void {
 
 async function clientFor(accountId: AccountId, onProgress: (progress: Progress) => void) {
   const stored = await storedAccount();
-  if (stored === null || AccountId.parse(stored.account.id) !== accountId) {
+  if (stored === null || stored.account.id !== accountId) {
     return null;
   }
   return createPaperlessClient<UploadFile>({

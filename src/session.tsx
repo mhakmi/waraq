@@ -8,7 +8,6 @@ import { createPaperlessClient, type PaperlessClient } from './paperless/client'
 import { queryClient } from './query';
 import { forgetBatch } from './scan/store';
 import { clearRecentSearches } from './search/store';
-import { AccountId } from './upload/machine';
 import { accountChanged, reportUploadError, uploadQueue } from './upload/queue';
 
 export type SessionState =
@@ -40,7 +39,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const signIn = useCallback(async (stored: StoredAccount) => {
     await saveAccount(stored);
     accountChanged();
-    uploadQueue.signedIn(AccountId.parse(stored.account.id)).catch(reportUploadError);
+    uploadQueue.signedIn(stored.account.id).catch(reportUploadError);
     setState({ kind: 'signedIn', stored });
   }, []);
 

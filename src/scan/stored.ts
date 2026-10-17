@@ -1,7 +1,8 @@
 import { z } from 'zod';
 
 import { CustomFieldValue, IsoDate } from '../paperless/schemas';
-import { AccountId, BatchId, JobId } from '../upload/machine';
+import { AccountId } from '../account/id';
+import { BatchId, JobId } from '../upload/machine';
 import { type Batch, PageId } from './batch';
 
 const Metadata = z.object({

@@ -1,6 +1,7 @@
 import type { ServerUrl } from '../paperless/url';
+import type { AccountId } from './id';
 
-export type AccountId = string & { readonly __brand: 'AccountId' };
+export type { AccountId };
 
 export type ServerAccount = {
   id: AccountId;

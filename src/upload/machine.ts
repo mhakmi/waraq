@@ -1,8 +1,11 @@
 import { z } from 'zod';
 
+import { AccountId } from '../account/id';
 import type { UploadFields } from '../paperless/client';
 import type { PaperlessError } from '../paperless/errors';
 import type { DocumentId, TaskId } from '../paperless/schemas';
+
+export { AccountId };
 
 const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 
@@ -11,9 +14,6 @@ export type JobId = z.infer<typeof JobId>;
 
 export const BatchId = z.string().regex(uuidPattern).brand<'BatchId'>();
 export type BatchId = z.infer<typeof BatchId>;
-
-export const AccountId = z.string().min(1).brand<'AccountId'>();
-export type AccountId = z.infer<typeof AccountId>;
 
 export type PageRotation = 0 | 90 | 180 | 270;
 

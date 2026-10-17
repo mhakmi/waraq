@@ -24,7 +24,7 @@ import { IconButton } from '../../../src/ui/IconButton';
 import { Menu, type MenuItem } from '../../../src/ui/Menu';
 import { PageThumb } from '../../../src/ui/PageThumb';
 import { Sheet } from '../../../src/ui/Sheet';
-import { AccountId, type JobId } from '../../../src/upload/machine';
+import type { JobId } from '../../../src/upload/machine';
 
 const pagePadding = 20;
 const seamWidth = 52;
@@ -40,7 +40,7 @@ function pairs<Item>(items: Item[]): Item[][] {
 export default function PageEditorScreen() {
   const colors = useColors();
   const router = useRouter();
-  const accountId = AccountId.parse(useSignedIn().account.id);
+  const accountId = useSignedIn().account.id;
   const id = useLocalSearchParams<{ id: string }>().id as JobId;
   const { batch } = useBatch();
   const { width: windowWidth } = useWindowDimensions();

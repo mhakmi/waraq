@@ -16,7 +16,7 @@ import { Icon } from '../../src/ui/Icon';
 import { IconButton } from '../../src/ui/IconButton';
 import { PageThumb } from '../../src/ui/PageThumb';
 import { Picker } from '../../src/ui/Picker';
-import { AccountId, type JobId } from '../../src/upload/machine';
+import type { JobId } from '../../src/upload/machine';
 import { enqueueBatch } from '../../src/upload/queue';
 
 type OneOf = 'correspondentId' | 'documentTypeId' | 'storagePathId';
@@ -36,7 +36,7 @@ const fieldLabels: Record<FieldName, string> = {
 export default function BatchDetailsScreen() {
   const colors = useColors();
   const router = useRouter();
-  const accountId = AccountId.parse(useSignedIn().account.id);
+  const accountId = useSignedIn().account.id;
   const { batch } = useBatch();
   const labels = useLabels();
   const createLabel = useCreateLabel();

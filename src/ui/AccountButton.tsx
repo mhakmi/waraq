@@ -4,14 +4,19 @@ import { copy } from '../copy';
 import { useSession, useSignedIn } from '../session';
 import { hostOf } from '../signin/connect';
 import { touchTarget, useColors } from '../theme';
+import { useUploadQueue } from '../upload/queue';
+import { unfinishedCount } from '../upload/rows';
 
 export function AccountButton() {
   const colors = useColors();
   const { account } = useSignedIn();
   const session = useSession();
+  const unfinished = unfinishedCount(useUploadQueue().jobs, account.id);
 
   function askToSignOut() {
-    Alert.alert(copy.account.signOutTitle, copy.account.signOutMessage(account.username, hostOf(account.serverUrl)), [
+    const message = copy.account.signOutMessage(account.username, hostOf(account.serverUrl));
+    const uploads = unfinished === 0 ? '' : ` ${copy.account.signOutWithUploads(unfinished)}`;
+    Alert.alert(copy.account.signOutTitle, message + uploads, [
       { text: copy.account.cancel, style: 'cancel' },
       { text: copy.account.signOut, style: 'destructive', onPress: () => session.signOut() },
     ]);

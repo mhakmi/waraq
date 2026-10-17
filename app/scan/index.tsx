@@ -12,12 +12,12 @@ import { radius, useColors } from '../../src/theme';
 import { Button } from '../../src/ui/Button';
 import { IconButton } from '../../src/ui/IconButton';
 import { PageThumb } from '../../src/ui/PageThumb';
-import { AccountId, type JobId } from '../../src/upload/machine';
+import type { JobId } from '../../src/upload/machine';
 
 export default function BatchScreen() {
   const colors = useColors();
   const router = useRouter();
-  const accountId = AccountId.parse(useSignedIn().account.id);
+  const accountId = useSignedIn().account.id;
   const { start } = useLocalSearchParams<{ start?: string }>();
   const { loaded, batch } = useBatch();
   const [problem, setProblem] = useState<string | null>(null);

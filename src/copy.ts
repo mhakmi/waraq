@@ -16,6 +16,10 @@ export const copy = {
   account: {
     signOutTitle: 'Sign out?',
     signOutMessage: (username: string, host: string) => `You are signed in as ${username} on ${host}.`,
+    signOutWithUploads: (count: number) =>
+      count === 1
+        ? 'One upload is not finished. It waits until this account signs in again.'
+        : `${count} uploads are not finished. They wait until this account signs in again.`,
     signOut: 'Sign out',
     cancel: 'Cancel',
   },

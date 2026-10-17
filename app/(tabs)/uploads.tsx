@@ -13,7 +13,7 @@ import { Button } from '../../src/ui/Button';
 import { Icon, type IconName } from '../../src/ui/Icon';
 import { Message } from '../../src/ui/Message';
 import type { Progress } from '../../src/upload/drain';
-import { AccountId, type UploadJob } from '../../src/upload/machine';
+import type { UploadJob } from '../../src/upload/machine';
 import { reportUploadError, uploadQueue, useUploadQueue } from '../../src/upload/queue';
 import { type RowLook, type UploadRow, uploadSections } from '../../src/upload/rows';
 
@@ -118,7 +118,7 @@ export default function UploadsScreen() {
   const now = useMinuteClock();
   const { account } = useSignedIn();
   const snapshot = useUploadQueue();
-  const sections = uploadSections(snapshot.jobs, AccountId.parse(account.id), {
+  const sections = uploadSections(snapshot.jobs, account.id, {
     now,
     online,
     progress: snapshot.progress,

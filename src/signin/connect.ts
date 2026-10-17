@@ -1,8 +1,8 @@
-import type { AccountId, StoredAccount } from '../account/types';
+import { accountIdFor } from '../account/id';
+import type { StoredAccount } from '../account/types';
 import { createPaperlessClient, type Fetch, obtainToken, type TokenError } from '../paperless/client';
 import { classifyNetworkMessage, findPaperless, type NetworkProblem, probePath } from '../paperless/probe';
 import { normalizeServerUrl, type ServerUrl } from '../paperless/url';
-import { uuidV7 } from '../upload/uuid';
 
 export type CheckStep = 'reached' | 'secure' | 'found' | 'signedIn';
 
@@ -158,11 +158,6 @@ function signInFailure(error: SignInError, credentials: Credentials): SignInFail
   }
 }
 
-function newAccountId(now: number): AccountId {
-  const random = Uint8Array.from({ length: 10 }, () => Math.floor(Math.random() * 256));
-  return uuidV7(now, random) as AccountId;
-}
-
 export async function signIn(server: Server, credentials: Credentials, fetch: Fetch, now: number): Promise<SignInResult> {
   let token: string;
   if (credentials.kind === 'token') {
@@ -197,7 +192,7 @@ export async function signIn(server: Server, credentials: Credentials, fetch: Fe
     kind: 'signed_in',
     stored: {
       account: {
-        id: newAccountId(now),
+        id: accountIdFor(server.baseUrl, info.value.user.username),
         serverUrl: server.baseUrl,
         username: info.value.user.username,
         serverVersion: info.value.serverVersion,

@@ -3,7 +3,8 @@ import { z } from 'zod';
 import type { Rotation } from '../../modules/scanner';
 import type { UploadFields } from '../paperless/client';
 import type { CustomFieldValue, IsoDate } from '../paperless/schemas';
-import type { AccountId, BatchId, JobId } from '../upload/machine';
+import type { AccountId } from '../account/id';
+import type { BatchId, JobId } from '../upload/machine';
 
 export type { Rotation };
 
