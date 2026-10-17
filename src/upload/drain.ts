@@ -69,9 +69,19 @@ function pageFiles(input: JobInput): string[] {
   return input.kind === 'pages' ? input.pages.map((page) => page.uri) : [];
 }
 
-function jobFiles(job: UploadJob): string[] {
-  const files = job.input.kind === 'pages' ? pageFiles(job.input) : [job.input.uri, job.input.thumbnailUri];
+function sentFiles(job: UploadJob): string[] {
+  const files = job.input.kind === 'pdf' ? [job.input.uri, job.input.thumbnailUri] : [];
   return Array.from(new Set(job.pdfPath === null ? files : [...files, job.pdfPath]));
+}
+
+function jobFiles(job: UploadJob): string[] {
+  return [...pageFiles(job.input), ...sentFiles(job)];
+}
+
+function pagesNoLongerNeeded(before: UploadJob, after: UploadJob): boolean {
+  const pdfBuilt = before.pdfPath === null && after.pdfPath !== null;
+  const pageMissing = after.state.kind === 'failed' && after.state.reason.kind === 'file_missing';
+  return pdfBuilt || pageMissing;
 }
 
 function earlier(current: number | null, candidate: number): number {
@@ -141,11 +151,11 @@ export function createUploadQueue<File>(deps: UploadQueueDeps<File>): UploadQueu
   }
 
   async function afterStep(before: UploadJob, after: UploadJob): Promise<void> {
-    if (before.state.kind === 'preparing' && after.state.kind !== 'preparing') {
-      await removeFiles(pageFiles(before.input));
+    if (pagesNoLongerNeeded(before, after)) {
+      await removeFiles(pageFiles(after.input));
     }
-    if (after.state.kind === 'done' && after.pdfPath !== null) {
-      await deps.removeFile(after.pdfPath);
+    if (after.state.kind === 'done') {
+      await removeFiles(sentFiles(after));
     }
   }
 

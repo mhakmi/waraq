@@ -101,7 +101,7 @@ const accepted: Record<StateName, EventName[]> = {
   failedRejected: ['retryRequested'],
   failedConsumption: ['retryRequested'],
   failedFileMissing: [],
-  failedPdf: [],
+  failedPdf: ['retryRequested'],
   failedUnreadable: [],
 };
 
@@ -136,6 +136,7 @@ describe('transitions the table accepts', () => {
     ['failedNotPermitted', events.retryRequested, { kind: 'waiting', attempt: 0, notBefore: now, maybeSent: true, unsureSince }],
     ['failedRejected', events.retryRequested, freshWait],
     ['failedConsumption', events.retryRequested, freshWait],
+    ['failedPdf', events.retryRequested, { kind: 'preparing' }],
   ])('%s + %o', (stateName, event, expected) => {
     expect(transition(states[stateName], event, now)).toEqual(expected);
   });

@@ -161,7 +161,7 @@ describe('run', () => {
     expect(h.removed).toEqual(['file:///pages/1-1.jpg', 'file:///pages/1-2.jpg', `/uploads/${jobId(1)}.pdf`]);
   });
 
-  test('removes the page files when the PDF cannot be built', async () => {
+  test('removes the page files when a page is missing, so the rest do not linger', async () => {
     const h = harness();
     h.deps.buildPdf = async () => failure({ kind: 'file_missing' });
     await h.store.insert(jobIn(1, { kind: 'preparing' }));
@@ -170,6 +170,39 @@ describe('run', () => {
 
     expect((await stored(h.store, 1))?.state).toEqual({ kind: 'failed', reason: { kind: 'file_missing' } });
     expect(h.removed).toEqual(['file:///pages/1-1.jpg', 'file:///pages/1-2.jpg']);
+  });
+
+  test('a PDF that failed to build keeps its pages, and a retry builds it from them', async () => {
+    const h = harness();
+    let diskFull = true;
+    h.deps.buildPdf = async (job) => (diskFull ? failure({ kind: 'pdf_failed', message: 'out of space' }) : success(`/uploads/${job.id}.pdf`));
+    await h.store.insert(jobIn(1, { kind: 'preparing' }));
+    const queue = createUploadQueue(h.deps);
+
+    await queue.run();
+    expect((await stored(h.store, 1))?.state).toEqual({ kind: 'failed', reason: { kind: 'pdf_failed', message: 'out of space' } });
+    expect(h.removed).toEqual([]);
+
+    diskFull = false;
+    await queue.retry(jobId(1));
+    await queue.run();
+    expect((await stored(h.store, 1))?.state.kind).toBe('processing');
+    expect(h.removed).toEqual(['file:///pages/1-1.jpg', 'file:///pages/1-2.jpg']);
+  });
+
+  test('a shared PDF and its thumbnail go when the job is done', async () => {
+    const h = harness();
+    const input = { kind: 'pdf' as const, uri: 'file:///batch/shared.pdf', thumbnailUri: 'file:///batch/shared.jpg' };
+    await h.store.insert({ ...jobIn(1, { kind: 'preparing' }), input });
+    const queue = createUploadQueue(h.deps);
+
+    await queue.run();
+    expect(h.removed).toEqual([]);
+
+    h.clock.now += 2000;
+    await queue.run();
+    expect((await stored(h.store, 1))?.state.kind).toBe('done');
+    expect(h.removed).toEqual(['file:///batch/shared.pdf', 'file:///batch/shared.jpg']);
   });
 
   test('deletes done jobs older than a week and keeps newer ones', async () => {

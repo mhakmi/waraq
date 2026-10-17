@@ -262,6 +262,8 @@ const transitions: TransitionTable = {
           return waitToSend(0, now);
         case 'not_permitted':
           return resumeAt(state.reason.resume, now);
+        case 'pdf_failed':
+          return { kind: 'preparing' };
         default:
           return 'refused';
       }
