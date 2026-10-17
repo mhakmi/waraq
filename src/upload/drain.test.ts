@@ -3,7 +3,7 @@ import { describe, expect, test } from 'vitest';
 import { failure, success } from '../paperless/errors';
 import type { DocumentId, TaskId } from '../paperless/schemas';
 import { type Batch, PageId } from '../scan/batch';
-import { createUploadQueue, jobInputOf, type QueueSnapshot, type UploadQueueDeps } from './drain';
+import { createUploadQueue, jobInputOf, type QueueSnapshot, retryAfterThrow, type UploadQueueDeps } from './drain';
 import { AccountId, BatchId, JobId, newUploadJob, type UploadJob, type UploadState } from './machine';
 import { MemoryJobStore, type UploadClient } from './runner';
 
@@ -219,23 +219,38 @@ describe('run', () => {
 });
 
 describe('run', () => {
-  test('a step that throws ends the run through onError, and the next run works', async () => {
-    const h = harness();
-    let builds = 0;
+  function diskFullUntilRetry(h: ReturnType<typeof harness>) {
     h.deps.buildPdf = async (job) => {
-      builds += 1;
-      if (builds === 1) {
+      if (h.clock.now < start + retryAfterThrow) {
         throw new Error('the disk is full');
       }
       return success(`/uploads/${job.id}.pdf`);
     };
+  }
+
+  test('a step that throws is reported once per run and leaves the other jobs running', async () => {
+    const h = harness();
+    diskFullUntilRetry(h);
+    await h.store.insert(jobIn(1, { kind: 'preparing' }));
+    await h.store.insert(jobIn(2, fresh));
+
+    await createUploadQueue(h.deps).run();
+
+    expect(h.errors).toEqual([new Error('the disk is full')]);
+    expect((await stored(h.store, 1))?.state.kind).toBe('preparing');
+    expect((await stored(h.store, 2))?.state.kind).toBe('processing');
+  });
+
+  test('a job whose step throws gets another try a minute later', async () => {
+    const h = harness();
+    diskFullUntilRetry(h);
     await h.store.insert(jobIn(1, { kind: 'preparing' }));
     const queue = createUploadQueue(h.deps);
 
     await queue.run();
-    expect(h.errors).toEqual([new Error('the disk is full')]);
-    expect(h.wakes).toEqual([]);
+    expect(h.wakes).toEqual([start + retryAfterThrow]);
 
+    h.clock.now = start + retryAfterThrow;
     await queue.run();
     expect((await stored(h.store, 1))?.state.kind).toBe('processing');
   });

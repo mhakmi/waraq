@@ -71,15 +71,22 @@ async function clientFor(accountId: AccountId, onProgress: (progress: Progress) 
   });
 }
 
+// A URI that is not a file, or a file the app may not read, counts as missing. File throws on both.
+function fileExists(uri: string): boolean {
+  try {
+    return new File(uri).exists;
+  } catch {
+    return false;
+  }
+}
+
 async function buildPdf(job: UploadJob): Promise<Result<string, PdfBuildFailure>> {
   if (job.input.kind === 'pdf') {
     return success(job.input.uri);
   }
   const pages = job.input.pages;
-  for (const page of pages) {
-    if (!new File(page.uri).exists) {
-      return failure({ kind: 'file_missing' });
-    }
+  if (!pages.every((page) => fileExists(page.uri))) {
+    return failure({ kind: 'file_missing' });
   }
   const folder = new Directory(Paths.document, 'uploads');
   if (!folder.exists) {
@@ -98,13 +105,12 @@ async function buildPdf(job: UploadJob): Promise<Result<string, PdfBuildFailure>
 }
 
 async function readFile(path: string): Promise<UploadFile | null> {
-  return new File(path).exists ? { uri: path } : null;
+  return fileExists(path) ? { uri: path } : null;
 }
 
 async function removeFile(uri: string): Promise<void> {
-  const file = new File(uri);
-  if (file.exists) {
-    file.delete();
+  if (fileExists(uri)) {
+    new File(uri).delete();
   }
 }
 

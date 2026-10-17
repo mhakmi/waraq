@@ -49,7 +49,9 @@ export type UploadQueue = {
   snapshot(): QueueSnapshot;
 };
 
-const week = 7 * 24 * 60 * 60 * 1000;
+const minute = 60 * 1000;
+const week = 7 * 24 * 60 * minute;
+export const retryAfterThrow = minute;
 const signedInEvent: UploadEvent = { kind: 'signedIn' };
 const retryEvent: UploadEvent = { kind: 'retryRequested' };
 
@@ -147,10 +149,14 @@ export function createUploadQueue<File>(deps: UploadQueueDeps<File>): UploadQueu
     }
   }
 
-  async function pass(): Promise<{ progressed: boolean; wakeAt: number | null }> {
+  async function pass(thrown: Set<JobId>): Promise<{ progressed: boolean; wakeAt: number | null }> {
     let progressed = false;
     let wakeAt: number | null = null;
     for (const job of await store.loadAll()) {
+      if (thrown.has(job.id)) {
+        wakeAt = earlier(wakeAt, deps.now() + retryAfterThrow);
+        continue;
+      }
       if (job.state.kind === 'done' && deps.now() - job.updatedAt > week) {
         await removeJob(job);
         continue;
@@ -171,19 +177,20 @@ export function createUploadQueue<File>(deps: UploadQueueDeps<File>): UploadQueu
         wakeAt = earlier(wakeAt, stepAt);
         continue;
       }
-      const next = await runStep(job, {
-        client,
-        store,
-        now: deps.now,
-        readFile: deps.readFile,
-        buildPdf: deps.buildPdf,
-      });
-      if (progress.delete(job.id)) {
-        changed();
-      }
-      if (next !== job) {
-        progressed = true;
-        await afterStep(job, next);
+      try {
+        const next = await runStep(job, { client, store, now: deps.now, readFile: deps.readFile, buildPdf: deps.buildPdf });
+        if (next !== job) {
+          progressed = true;
+          await afterStep(job, next);
+        }
+      } catch (error) {
+        thrown.add(job.id);
+        deps.onError(error);
+        wakeAt = earlier(wakeAt, deps.now() + retryAfterThrow);
+      } finally {
+        if (progress.delete(job.id)) {
+          changed();
+        }
       }
     }
     return { progressed, wakeAt };
@@ -199,9 +206,10 @@ export function createUploadQueue<File>(deps: UploadQueueDeps<File>): UploadQueu
       }
       let wakeAt: number | null = null;
       let passAgain = true;
+      const thrown = new Set<JobId>();
       while (passAgain) {
         again = false;
-        const result = await pass();
+        const result = await pass(thrown);
         wakeAt = result.wakeAt;
         passAgain = result.progressed || again;
       }
