@@ -19,6 +19,8 @@ const config: ExpoConfig = {
       'android.permission.SYSTEM_ALERT_WINDOW',
       'android.permission.USE_BIOMETRIC',
       'android.permission.USE_FINGERPRINT',
+      // WorkManager declares it for its foreground service, which the upload task never uses.
+      'android.permission.FOREGROUND_SERVICE',
     ],
     intentFilters: ['SEND', 'SEND_MULTIPLE'].map((action) => ({
       action,
