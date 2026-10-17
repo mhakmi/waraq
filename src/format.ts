@@ -31,6 +31,10 @@ export function calendarDateOf(picked: Date): IsoDate {
   return `${picked.getUTCFullYear()}-${twoDigits(picked.getUTCMonth() + 1)}-${twoDigits(picked.getUTCDate())}` as IsoDate;
 }
 
+export function todayCalendarDate(now: Date): IsoDate {
+  return `${now.getFullYear()}-${twoDigits(now.getMonth() + 1)}-${twoDigits(now.getDate())}` as IsoDate;
+}
+
 export function formatInstantDate(instant: string, locale: string): string {
   return new Date(instant).toLocaleDateString(locale, { month: 'short', day: 'numeric', year: 'numeric' });
 }

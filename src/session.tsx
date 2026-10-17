@@ -6,6 +6,7 @@ import { queryPersister } from './cache/persister';
 import type { StoredAccount } from './account/types';
 import { createPaperlessClient, type PaperlessClient } from './paperless/client';
 import { queryClient } from './query';
+import { clearRecentSearches } from './search/store';
 
 export type SessionState =
   | { kind: 'loading' }
@@ -41,6 +42,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const signOut = useCallback(async () => {
     if (state.kind === 'signedIn') {
       await clearAccount(state.stored.account.id);
+      await clearRecentSearches(state.stored.account.id);
     }
     queryClient.clear();
     await queryPersister.removeClient();

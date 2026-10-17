@@ -2,11 +2,13 @@ import { type ReactNode, useState } from 'react';
 import { StyleSheet, Text, TextInput, type TextInputProps, View } from 'react-native';
 
 import { useColors } from '../theme';
+import { FieldLabel } from './FieldBox';
 
 type FieldProps = Pick<
   TextInputProps,
   'value' | 'onChangeText' | 'placeholder' | 'keyboardType' | 'autoComplete' | 'autoFocus' | 'secureTextEntry' | 'onSubmitEditing'
 > & {
+  changed?: boolean;
   label: string;
   help?: string;
   error?: string | null;
@@ -14,13 +16,13 @@ type FieldProps = Pick<
   trailing?: ReactNode;
 };
 
-export function Field({ label, help, error, plainText = false, trailing, ...input }: FieldProps) {
+export function Field({ label, help, error, plainText = false, trailing, changed = false, ...input }: FieldProps) {
   const colors = useColors();
   const [focused, setFocused] = useState(false);
-  const borderColor = error ? colors.danger : focused ? colors.accent : colors.line;
+  const borderColor = error ? colors.danger : focused || changed ? colors.accent : colors.line;
   return (
     <View style={styles.field}>
-      <Text style={[styles.label, { color: colors.inkMuted }]}>{label}</Text>
+      <FieldLabel label={label} changed={changed} />
       <View
         style={[
           styles.box,
@@ -52,7 +54,6 @@ export function Field({ label, help, error, plainText = false, trailing, ...inpu
 
 const styles = StyleSheet.create({
   field: { gap: 6 },
-  label: { fontSize: 13.5, fontWeight: '500' },
   box: { minHeight: 56, flexDirection: 'row', alignItems: 'center', gap: 8, paddingInlineStart: 16, paddingInlineEnd: 4, borderRadius: 12 },
   input: { flex: 1, minWidth: 0, fontSize: 16, paddingBlock: 8 },
   help: { fontSize: 13.5 },
