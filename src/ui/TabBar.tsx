@@ -1,0 +1,59 @@
+import type { BottomTabBarProps } from 'expo-router/js-tabs';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
+
+import { useColors } from '../theme';
+import { Icon, type IconName } from './Icon';
+
+export const tabBarHeight = 80;
+
+const tabIcons: Record<string, IconName> = {
+  index: 'inbox',
+  documents: 'documents',
+  uploads: 'upload',
+};
+
+export function TabBar({ state, descriptors, emitter, navigateToTab, insets }: BottomTabBarProps) {
+  const colors = useColors();
+  return (
+    <View
+      accessibilityRole="tablist"
+      style={[
+        styles.bar,
+        { backgroundColor: colors.surfaceRaised, borderTopColor: colors.line, paddingBottom: 14 + insets.bottom },
+      ]}
+    >
+      {state.routes.map((route, index) => {
+        const focused = state.index === index;
+        const label = descriptors[route.key].options.title ?? route.name;
+        const onPress = () => {
+          const event = emitter.emit({ type: 'tabPress', target: route.key, canPreventDefault: true });
+          if (!focused && !event.defaultPrevented) {
+            navigateToTab(route.key);
+          }
+        };
+        return (
+          <Pressable
+            key={route.key}
+            accessibilityRole="tab"
+            accessibilityLabel={label}
+            accessibilityState={{ selected: focused }}
+            onPress={onPress}
+            style={styles.item}
+          >
+            <View style={[styles.pill, focused && { backgroundColor: colors.accentSoft }]}>
+              <Icon name={tabIcons[route.name]} color={focused ? colors.onAccentSoft : colors.inkMuted} />
+            </View>
+            <Text style={[styles.label, { color: focused ? colors.ink : colors.inkMuted }]}>{label}</Text>
+          </Pressable>
+        );
+      })}
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  bar: { flexDirection: 'row', minHeight: tabBarHeight, paddingTop: 10, borderTopWidth: 1 },
+  item: { flex: 1, minHeight: 56, alignItems: 'center', gap: 4 },
+  pill: { width: 64, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
+  label: { fontSize: 12.5, fontWeight: '500' },
+});
