@@ -32,6 +32,13 @@ const shapes = {
   tag: '<path d="M3 12V4h8l9 9-8 8z"/><circle cx="7.5" cy="8.5" r="1.3"/>',
   info: '<circle cx="12" cy="12" r="9"/><path d="M12 11v6"/><circle cx="12" cy="7.5" r="0.8" fill="currentColor"/>',
   offline: '<path d="M3 3l18 18M8.5 16.5a5 5 0 0 1 7 0M4.5 12.5a10 10 0 0 1 4.5-2.6M19.5 12.5a10 10 0 0 0-3-2.1M2 8.5A15 15 0 0 1 6 6M22 8.5A15 15 0 0 0 11 4.6"/><circle cx="12" cy="20" r="0.8" fill="currentColor"/>',
+  camera: '<path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/>',
+  rotate: '<path d="M20 12a8 8 0 1 1-2.3-5.6M20 4v5h-5"/>',
+  move: '<path d="M4 12h15M14 7l5 5-5 5"/>',
+  scissors: '<circle cx="6" cy="7" r="2.5"/><circle cx="6" cy="17" r="2.5"/><path d="M8.2 8.4 20 17M8.2 15.6 20 7"/>',
+  chevronStart: '<path d="m15 6-6 6 6 6"/>',
+  chevronEnd: '<path d="m9 6 6 6-6 6"/>',
+  files: '<path d="M8 3h7l4 4v11a1 1 0 0 1-1 1H8a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z"/><path d="M15 3v4h4M4 7v13a1 1 0 0 0 1 1h10"/>',
   mark: '<path d="M7 3h8l4 4v12a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z"/><path d="M15 3v4h4M8.5 12h7M8.5 16h5"/>',
 };
 

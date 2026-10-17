@@ -53,7 +53,8 @@ function Screens() {
     <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.surface } }}>
       <Stack.Protected guard={signedIn}>
         <Stack.Screen name="(tabs)" />
-        <Stack.Screen name="scan" />
+        <Stack.Screen name="scan/index" />
+        <Stack.Screen name="scan/pages/[id]" />
         <Stack.Screen name="document/[id]/index" />
         <Stack.Screen name="document/[id]/edit" />
       </Stack.Protected>
