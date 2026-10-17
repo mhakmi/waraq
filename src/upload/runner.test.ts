@@ -71,7 +71,7 @@ describe('reconcile', () => {
 
   test('follows a task that carries the file name, whatever its status', async () => {
     const state = await reconcileWith({ findConsumeTaskByFilename: async () => success(taskId) });
-    expect(state).toEqual({ kind: 'processing', taskId, checks: 0, nextCheckAt: now });
+    expect(state).toEqual({ kind: 'processing', taskId, checks: 0, failedChecks: 0, nextCheckAt: now, startedAt: now });
   });
 
   test('finishes on a document with the file name when no task has it', async () => {
@@ -133,14 +133,18 @@ describe('reconcile', () => {
 });
 
 describe('check', () => {
-  const processing = jobIn({ kind: 'processing', taskId, checks: 0, nextCheckAt: 0 }, '/file.pdf');
+  const startedAt = now - 1000;
+  const processing = jobIn(
+    { kind: 'processing', taskId, checks: 0, failedChecks: 0, nextCheckAt: 0, startedAt },
+    '/file.pdf',
+  );
 
   test('stops at sign-in and resumes the check with its task id after a 401', async () => {
     const deps = depsAt(now, new MemoryJobStore(), { ...offlineClient, getTask: async () => unauthorized });
     const next = await runStep(processing, deps);
     expect(next.state).toEqual({
       kind: 'failed',
-      reason: { kind: 'sign_in_required', resume: { step: 'check', taskId } },
+      reason: { kind: 'sign_in_required', resume: { step: 'check', taskId, startedAt } },
     });
   });
 });
