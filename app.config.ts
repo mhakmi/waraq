@@ -11,8 +11,16 @@ const config: ExpoConfig = {
   userInterfaceStyle: 'automatic',
   android: {
     package: brand.androidPackage,
+    allowBackup: false,
+    blockedPermissions: [
+      'android.permission.READ_EXTERNAL_STORAGE',
+      'android.permission.WRITE_EXTERNAL_STORAGE',
+      'android.permission.SYSTEM_ALERT_WINDOW',
+      'android.permission.USE_BIOMETRIC',
+      'android.permission.USE_FINGERPRINT',
+    ],
   },
-  plugins: ['expo-router'],
+  plugins: ['expo-router', './plugins/network-security.ts'],
 };
 
 export default config;
