@@ -6,6 +6,7 @@
 #   dev/android.sh boot          boot the waraq_pixel emulator headless, creating it if missing
 #   dev/android.sh install       install the APK on the emulator
 #   dev/android.sh shot <name>   save a screenshot as .dev-data/shots/<name>.png
+#   dev/android.sh flow          sign in on the emulator in light, dark, and large text, and once with a wrong password
 #   dev/android.sh logs          print the app's log lines
 #   dev/android.sh adb <args>    run adb against this project's own adb server
 #   dev/android.sh stop          stop this emulator and its adb server, and nothing else
@@ -163,6 +164,111 @@ shot() {
   echo "$SHOTS/$1.png"
 }
 
+node_bounds() {
+  adb shell uiautomator dump /sdcard/ui.xml > /dev/null 2>&1 || true
+  adb shell cat /sdcard/ui.xml | tr '>' '\n' \
+    | sed -nE 's/.* text="([^"]*)".* class="([^"]*)".* content-desc="([^"]*)".* bounds="\[([0-9]+),([0-9]+)\]\[([0-9]+),([0-9]+)\]".*/\1|\2|\3|\4 \5 \6 \7/p' \
+    | awk -F'|' -v label="$1" -v class="${2:-}" \
+      '($1 == label || $3 == label) && (class == "" || $2 == class) { print $4; exit }'
+}
+
+wait_for() {
+  local attempt
+  for attempt in $(seq 1 "$2"); do
+    if [ -n "$(node_bounds "$1")" ]; then
+      return 0
+    fi
+    sleep 1
+  done
+  echo "gave up waiting for \"$1\"" >&2
+  return 1
+}
+
+tap() {
+  local bounds
+  bounds=$(node_bounds "$1" "${2:-}")
+  if [ -z "$bounds" ]; then
+    echo "no node labelled \"$1\"" >&2
+    return 1
+  fi
+  set -- $bounds
+  adb shell input tap $(( ($1 + $3) / 2 )) $(( ($2 + $4) / 2 ))
+}
+
+type_into() {
+  tap "$1" android.widget.EditText
+  adb shell input text "$2"
+}
+
+scroll_to() {
+  local swipe
+  for swipe in 1 2 3 4 5; do
+    if [ -n "$(node_bounds "$1")" ]; then
+      return 0
+    fi
+    adb shell input swipe 540 1700 540 900 400
+    sleep 1
+  done
+  wait_for "$1" 1
+}
+
+launch_signed_out() {
+  adb shell pm clear "$APP_ID" > /dev/null
+  adb shell monkey -p "$APP_ID" -c android.intent.category.LAUNCHER 1 > /dev/null 2>&1
+  wait_for "Connect to your server" 30
+}
+
+sign_in() {
+  local run=$1 password=$2
+  launch_signed_out
+  shot "$run-1-address"
+  type_into "Server address" "http://10.0.2.2:8010"
+  tap "Continue"
+  wait_for "Found Paperless-ngx 3.0 or newer at 10.0.2.2:8010" 20
+  type_into "Username" admin
+  type_into "Password" "$password"
+  shot "$run-2-credentials"
+  tap "Sign in"
+}
+
+see_inbox() {
+  local run=$1
+  sign_in "$run" waraq-dev-password
+  wait_for "Interest income slip" 30
+  shot "$run-3-inbox"
+  scroll_to "School trip permission letter"
+  scroll_to "Electricity bill, September"
+  shot "$run-4-inbox-scrolled"
+}
+
+
+reset_display() {
+  adb shell cmd uimode night no > /dev/null
+  adb shell settings put system font_scale 1.0
+}
+
+flow() {
+  trap reset_display EXIT
+  reset_display
+
+  see_inbox light
+
+  sign_in wrong-password not-the-password
+  wait_for "Here is how far the connection got." 20
+  wait_for "The username or password is wrong." 1
+  shot wrong-password-3-checklist
+
+  # Paperless-ngx allows five sign-in requests a minute from one address, and each run makes two.
+  sleep 61
+  adb shell cmd uimode night yes > /dev/null
+  see_inbox dark
+  reset_display
+
+  adb shell settings put system font_scale 1.3
+  see_inbox large-text
+  echo "flow passed, screenshots in $SHOTS"
+}
+
 logs() {
   adb logcat -d -v time | grep -E "ReactNativeJS|AndroidRuntime|$APP_ID" || true
 }
@@ -173,7 +279,7 @@ stop() {
 }
 
 case "${1:-}" in
-  build | badging | boot | install | logs | stop)
+  build | badging | boot | install | flow | logs | stop)
     "$1"
     ;;
   adb)
