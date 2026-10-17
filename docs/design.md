@@ -154,6 +154,8 @@ The queue is the part people trust or stop using. Upload problems are the second
 
 Paperless-ngx accepts duplicates, so a retry after a lost reply would make a second document. Waraq avoids that with the file name. Each document gets an id when it is queued, a UUID version 7, and the PDF goes up as `<id>.pdf`. When the app does not know whether an upload reached the server, because the app was killed or the connection dropped mid-request, it asks first.
 
+It looks for a consume task with that file name, of any status, and follows it if one exists. Only then does it look for the document. In the other order, a task that finished between the two lookups would be missed by both. A proxy can still hand the request to Paperless after the phone has gone, so for two minutes after the send started, "nothing found" means "look again in 30 seconds", not "send again".
+
 ```mermaid
 sequenceDiagram
 	participant Queue as Upload queue (SQLite and files)
@@ -208,7 +210,10 @@ stateDiagram-v2
 
 - **Retries.** A send retries after 5 seconds, doubling up to 30 minutes. Network errors never give up, and the screen shows the attempt count.
 - **Following the task.** The app checks the task after 2 seconds, doubling up to one minute. The server's websocket accepts only a browser session cookie, so the app polls.
-- **Sign-in expired.** A 401 holds every job of that account until the user signs in again, then they continue on their own.
+- **Sign-in expired.** A 401 holds every job of that account until the user signs in again. Each job remembers its step, so a job that was checking a task goes back to checking it and never resends a file the server has.
+- **Missing permission.** A 403 means the account may not add documents. Signing in again would not help, so the message says which permission is missing and offers Retry.
+- **One sender per job.** Before it sends, the runner claims the job with a write that succeeds only if the row is unchanged since it was read. A second runner that loaded the same job loses the claim and sends nothing. One drain runs at a time, and the recovery of jobs left in `sending` runs once when the app process starts.
+- **A task that never answers.** After ten checks in a row with no answer, the job goes back to the lookup by file name.
 - **Delete.** Allowed while a job waits, after it fails, and after it is done. Not while it is sending or processing, because the server already has the file.
 - **Too large.** A 413 comes from a proxy in front of Paperless, which sets no limit of its own. The message says "Your server's upload limit is smaller than this file" and names the size.
 
@@ -229,6 +234,7 @@ A foreground service would upload faster after the app is closed. On Android 15 
 | processing | Processing on your server |
 | done | Done, with Open |
 | failed, sign in | Sign in again to send |
+| failed, permission | Your account may not add documents. Ask the server's admin. |
 | failed, rejected | The server refused it, with its reason and Retry |
 | failed, consumption | Paperless could not read this file, with its message and Retry |
 
@@ -317,21 +323,28 @@ type UploadJob = {
 
 type UploadState =
 	| { kind: 'preparing' }
-	| { kind: 'waiting'; attempt: number; notBefore: number; maybeSent: boolean }
+	| { kind: 'waiting'; attempt: number; notBefore: number; maybeSent: false }
+	| { kind: 'waiting'; attempt: number; notBefore: number; maybeSent: true; startedAt: number }
 	| { kind: 'sending'; attempt: number; startedAt: number }
-	| { kind: 'processing'; taskId: TaskId; checks: number; nextCheckAt: number }
+	| { kind: 'processing'; taskId: TaskId; checks: number; failedChecks: number; nextCheckAt: number; startedAt: number }
 	| { kind: 'done'; documentId: DocumentId }
 	| { kind: 'failed'; reason: FailureReason };
 
+type ResumePoint =                 // where a job picks up after the user signs in again
+	| { step: 'send' }
+	| { step: 'reconcile'; startedAt: number }
+	| { step: 'check'; taskId: TaskId; startedAt: number };
+
 type FailureReason =
-	| { kind: 'sign_in_required' }
+	| { kind: 'sign_in_required'; resume: ResumePoint }   // 401
+	| { kind: 'not_permitted'; resume: ResumePoint }      // 403, the account lacks a permission
 	| { kind: 'rejected'; status: number; message: string }
 	| { kind: 'consumption_failed'; message: string }
 	| { kind: 'file_missing' }
 	| { kind: 'pdf_failed'; message: string };
 ```
 
-A job in `sending` holds no task id, and a job in `processing` always holds one. The union makes the wrong combination impossible to write.
+A job in `sending` holds no task id, and a job in `processing` always holds one. A job that may already be on the server always holds the time its send started. The union makes the wrong combination impossible to write.
 
 ### Where each thing lives
 
