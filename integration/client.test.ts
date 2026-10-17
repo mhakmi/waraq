@@ -153,3 +153,76 @@ describe('documents', () => {
     }
   });
 });
+
+describe('editing', () => {
+  const marker = uniqueName('edit').replace(/-/g, '');
+  let inboxTag: number;
+  let keptTag: number;
+  let document: DocumentId;
+
+  beforeAll(async () => {
+    const created = await client.createTag(uniqueName('inbox'));
+    if (!created.ok) {
+      throw new Error(JSON.stringify(created.error));
+    }
+    inboxTag = created.value.id;
+    keptTag = await createLabel('tags', uniqueName('kept'));
+    document = await uploadAndWait(`${marker} bill`, [inboxTag, keptTag], '2026-09-27' as IsoDate);
+  });
+
+  test('a PATCH with only the tags changes the tags and leaves every other field', async () => {
+    const before = await client.getDocument(document);
+    const result = await client.updateDocument(document, { tagIds: [keptTag] });
+    if (!before.ok || !result.ok) {
+      throw new Error(JSON.stringify(before.ok ? result : before));
+    }
+    expect(result.value.tagIds).toEqual([keptTag]);
+    expect({ ...result.value, tagIds: before.value.tagIds, modified: before.value.modified }).toEqual(before.value);
+  });
+
+  test('a PATCH sets the title, a calendar date, an archive number, and clears a correspondent', async () => {
+    const correspondent = await createLabel('correspondents', uniqueName('sender'));
+    await client.updateDocument(document, { correspondentId: correspondent });
+    const asn = 900_000 + Math.floor(Math.random() * 99_999);
+    const result = await client.updateDocument(document, {
+      title: `${marker} bill, September 2026`,
+      created: '2026-01-01' as IsoDate,
+      archiveSerialNumber: asn,
+      correspondentId: null,
+    });
+    expect(result.ok && result.value).toMatchObject({
+      title: `${marker} bill, September 2026`,
+      created: '2026-01-01',
+      archiveSerialNumber: asn,
+      correspondentId: null,
+    });
+  });
+
+  test('a new correspondent can be made by name', async () => {
+    const name = uniqueName('made');
+    const result = await client.createCorrespondent(name);
+    expect(result.ok && result.value.name).toBe(name);
+  });
+
+  test('autocomplete suggests a word from the document text', async () => {
+    const word = marker.slice(0, 8);
+    const result = await eventually(async () => {
+      const found = await client.autocomplete(word);
+      return found.ok && found.value.length > 0 ? found : null;
+    });
+    expect(result.ok && result.value.some((suggestion) => suggestion.startsWith(word))).toBe(true);
+  });
+
+  test('a note can be added and read back', async () => {
+    const added = await client.addNote(document, 'Pay before October 19.');
+    expect(added.ok && added.value.map((note) => note.text)).toEqual(['Pay before October 19.']);
+  });
+
+  test('delete removes the document', async () => {
+    const doomed = await uploadAndWait(`${marker} doomed`, [], '2026-02-02' as IsoDate);
+    const result = await client.deleteDocument(doomed);
+    expect(result).toEqual({ ok: true, value: null });
+    const after = await client.getDocument(doomed);
+    expect(after).toEqual({ ok: false, error: { kind: 'not_found' } });
+  });
+});

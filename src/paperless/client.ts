@@ -2,6 +2,7 @@ import { z } from 'zod';
 
 import { describeError, errorForStatus, failure, type PaperlessError, type Result, success } from './errors';
 import {
+  ChangedDocument,
   Correspondent,
   CustomField,
   type CustomFieldValue,
@@ -83,11 +84,23 @@ export type DocumentQuery = {
   tagIdsAny?: number[];
   correspondentId?: number;
   documentTypeId?: number;
+  storagePathId?: number;
   createdFrom?: IsoDate;
   createdTo?: IsoDate;
   orderBy?: { field: DocumentOrderField; descending: boolean };
   page?: number;
   pageSize?: number;
+  savedViewDefaults?: Record<string, string>;
+};
+
+export type DocumentChanges = {
+  title?: string;
+  created?: IsoDate;
+  correspondentId?: number | null;
+  documentTypeId?: number | null;
+  storagePathId?: number | null;
+  tagIds?: number[];
+  archiveSerialNumber?: number | null;
 };
 
 export type FileRequest = { url: string; headers: Record<string, string> };
@@ -120,7 +133,7 @@ type Connection = {
 };
 
 type RequestOptions = {
-  method?: 'GET' | 'POST';
+  method?: 'GET' | 'POST' | 'PATCH' | 'DELETE';
   query?: Record<string, QueryValue>;
   body?: string | FormData;
   timeoutMs?: number;
@@ -182,6 +195,9 @@ async function send(
   if (status < 200 || status >= 300) {
     return failure(errorForStatus(status, text));
   }
+  if (text === '') {
+    return success({ headers: responseHeaders, body: null });
+  }
   try {
     return success({ headers: responseHeaders, body: JSON.parse(text) });
   } catch {
@@ -235,16 +251,17 @@ function idList(ids: number[] | undefined): string | undefined {
   return ids === undefined || ids.length === 0 ? undefined : ids.join(',');
 }
 
-function documentQueryParameters(query: DocumentQuery): Record<string, QueryValue> {
+export function documentQueryParameters(query: DocumentQuery): Record<string, QueryValue> {
   const ordering = query.orderBy
     ? `${query.orderBy.descending ? '-' : ''}${query.orderBy.field}`
     : undefined;
-  return {
+  const own: Record<string, QueryValue> = {
     query: query.query,
     tags__id__all: idList(query.tagIdsAll),
     tags__id__in: idList(query.tagIdsAny),
     correspondent__id: query.correspondentId,
     document_type__id: query.documentTypeId,
+    storage_path__id: query.storagePathId,
     created__gte: query.createdFrom,
     created__lte: query.createdTo,
     ordering,
@@ -253,6 +270,31 @@ function documentQueryParameters(query: DocumentQuery): Record<string, QueryValu
     fields: documentSummaryFields.join(','),
     truncate_content: true,
   };
+  const parameters: Record<string, QueryValue> = { ...query.savedViewDefaults };
+  for (const [key, value] of Object.entries(own)) {
+    if (value !== undefined) {
+      parameters[key] = value;
+    }
+  }
+  return parameters;
+}
+
+function wireChanges(changes: DocumentChanges): Record<string, unknown> {
+  const wire: Record<string, unknown> = {
+    title: changes.title,
+    created: changes.created,
+    correspondent: changes.correspondentId,
+    document_type: changes.documentTypeId,
+    storage_path: changes.storagePathId,
+    tags: changes.tagIds,
+    archive_serial_number: changes.archiveSerialNumber,
+  };
+  for (const key of Object.keys(wire)) {
+    if (wire[key] === undefined) {
+      delete wire[key];
+    }
+  }
+  return wire;
 }
 
 function formFromFields(fields: UploadFields): FormData {
@@ -382,6 +424,21 @@ export function createPaperlessClient<File>(options: ClientOptions<File>) {
       return requestJson(connection, `documents/${id}/`, DocumentDetail);
     },
 
+    updateDocument(id: DocumentId, changes: DocumentChanges) {
+      return requestJson(connection, `documents/${id}/`, ChangedDocument, {
+        method: 'PATCH',
+        body: JSON.stringify(wireChanges(changes)),
+      });
+    },
+
+    deleteDocument(id: DocumentId) {
+      return requestJson(connection, `documents/${id}/`, z.null(), { method: 'DELETE' });
+    },
+
+    autocomplete(term: string, limit = 10) {
+      return requestJson(connection, 'search/autocomplete/', z.array(z.string()), { query: { term, limit } });
+    },
+
     documentFile(id: DocumentId, file: DocumentFile, fileOptions: { original?: boolean } = {}): FileRequest {
       const query = fileOptions.original ? { original: true } : {};
       return {
@@ -418,6 +475,11 @@ export function createPaperlessClient<File>(options: ClientOptions<File>) {
     listStoragePaths: () => listAll(connection, 'storage_paths/', StoragePath),
     listCustomFields: () => listAll(connection, 'custom_fields/', CustomField),
     listSavedViews: () => listAll(connection, 'saved_views/', SavedView),
+
+    createTag: (name: string) =>
+      requestJson(connection, 'tags/', Tag, { method: 'POST', body: JSON.stringify({ name }) }),
+    createCorrespondent: (name: string) =>
+      requestJson(connection, 'correspondents/', Correspondent, { method: 'POST', body: JSON.stringify({ name }) }),
 
     postDocument(fields: UploadFields, file: File, filename: string): Promise<Result<TaskId>> {
       const form = formFromFields(fields);

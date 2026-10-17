@@ -95,22 +95,32 @@ export const DocumentSummary = z
   }));
 export type DocumentSummary = z.infer<typeof DocumentSummary>;
 
-export const DocumentDetail = z
-  .object({
-    ...documentSummaryShape,
-    mime_type: z.string(),
-    owner: z.number().int().nullable(),
-    user_can_change: z.boolean(),
-    custom_fields: z.array(WireCustomFieldValue),
-  })
-  .transform((document) => ({
+const documentDetailShape = {
+  ...documentSummaryShape,
+  mime_type: z.string(),
+  owner: z.number().int().nullable(),
+  custom_fields: z.array(WireCustomFieldValue),
+};
+
+function detailFromWire(document: z.infer<z.ZodObject<typeof documentDetailShape>>, userCanChange: boolean) {
+  return {
     ...summaryFromWire(document),
     mimeType: document.mime_type,
     ownerId: document.owner,
-    userCanChange: document.user_can_change,
+    userCanChange,
     customFields: document.custom_fields,
-  }));
+  };
+}
+
+export const DocumentDetail = z
+  .object({ ...documentDetailShape, user_can_change: z.boolean() })
+  .transform((document) => detailFromWire(document, document.user_can_change));
 export type DocumentDetail = z.infer<typeof DocumentDetail>;
+
+// The answer to a PATCH holds the full permissions in place of user_can_change, and the user who just changed the document may change it.
+export const ChangedDocument = z
+  .object(documentDetailShape)
+  .transform((document): DocumentDetail => detailFromWire(document, true));
 
 export const DocumentIdOnly = z.object({ id: DocumentId }).transform((document) => document.id);
 
@@ -142,7 +152,8 @@ export const Tag = z
     text_color: z.string(),
     is_inbox_tag: z.boolean(),
     parent: z.number().int().nullable(),
-    document_count: z.number().int(),
+    // The answer to creating a tag or a correspondent leaves the count out.
+    document_count: z.number().int().default(0),
   })
   .transform((tag) => ({
     id: tag.id,
@@ -159,7 +170,7 @@ export const Correspondent = z
   .object({
     id: z.number().int(),
     name: z.string(),
-    document_count: z.number().int(),
+    document_count: z.number().int().default(0),
   })
   .transform((correspondent) => ({
     id: correspondent.id,

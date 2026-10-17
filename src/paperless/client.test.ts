@@ -121,3 +121,34 @@ describe('extra headers', () => {
     expect(sent[0]['CF-Access-Client-Id']).toBe('id');
   });
 });
+
+describe('updateDocument', () => {
+  test('sends PATCH with only the given fields, under their wire names, and null to clear one', async () => {
+    const sent: { method: string; body: unknown }[] = [];
+    const client = createPaperlessClient({
+      baseUrl,
+      auth: { kind: 'token', token: 'token' },
+      fetch: async (_, init) => {
+        sent.push({ method: init.method, body: JSON.parse(String(init.body)) });
+        return new Response('{}', { status: 400 });
+      },
+      appendFile: () => {},
+    });
+    await client.updateDocument(1 as DocumentId, { tagIds: [3] });
+    await client.updateDocument(1 as DocumentId, { title: 'Bill', correspondentId: null, archiveSerialNumber: 12 });
+    expect(sent).toEqual([
+      { method: 'PATCH', body: { tags: [3] } },
+      { method: 'PATCH', body: { title: 'Bill', correspondent: null, archive_serial_number: 12 } },
+    ]);
+  });
+});
+
+test('deleteDocument reads the empty 204 answer as success', async () => {
+  const client = createPaperlessClient({
+    baseUrl,
+    auth: { kind: 'token', token: 'token' },
+    fetch: async () => new Response(null, { status: 204 }),
+    appendFile: () => {},
+  });
+  expect(await client.deleteDocument(1 as DocumentId)).toEqual({ ok: true, value: null });
+});
