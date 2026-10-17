@@ -88,19 +88,6 @@ const fieldsSchema: z.ZodType<UploadFields> = z.object({
   customFields: z.array(CustomFieldValue),
 });
 
-const jobSchema: z.ZodType<UploadJob> = z.object({
-  id: JobId,
-  accountId: AccountId,
-  batchId: BatchId,
-  fields: fieldsSchema,
-  input: inputSchema,
-  pdfPath: z.string().nullable(),
-  pageCount: z.number().int(),
-  createdAt: z.number(),
-  updatedAt: z.number(),
-  state: stateSchema,
-});
-
 type StoredRow = {
   id: string;
   account_id: string;
@@ -149,27 +136,33 @@ function readJson(text: string): unknown {
   }
 }
 
-function jobFromRow(row: StoredRow): UploadJob {
-  const fields = readJson(row.fields);
-  const input = readJson(row.input);
-  const parsed = jobSchema.safeParse({
-    id: row.id,
-    accountId: row.account_id,
-    batchId: row.batch_id,
-    fields,
-    input,
-    pdfPath: row.pdf_path,
-    pageCount: row.page_count,
-    createdAt: row.created_at,
-    updatedAt: row.updated_at,
-    state: readJson(row.state),
-  });
-  return parsed.success ? parsed.data : unreadableJob(row, z.prettifyError(parsed.error));
+const columnsRead: Record<UploadState['kind'], { fields: boolean; input: boolean }> = {
+  preparing: { fields: true, input: true },
+  waiting: { fields: true, input: false },
+  sending: { fields: true, input: false },
+  processing: { fields: true, input: false },
+  done: { fields: false, input: false },
+  failed: { fields: true, input: true },
+};
+
+function unreadable(column: keyof StoredRow, error: z.ZodError): UploadState {
+  return { kind: 'failed', reason: { kind: 'unreadable', message: `${column}: ${z.prettifyError(error)}` } };
 }
 
-function unreadableJob(row: StoredRow, message: string): UploadJob {
+function jobFromRow(row: StoredRow): UploadJob {
+  const state = stateSchema.safeParse(readJson(row.state));
   const fields = fieldsSchema.safeParse(readJson(row.fields));
   const input = inputSchema.safeParse(readJson(row.input));
+  let shown: UploadState;
+  if (!state.success) {
+    shown = unreadable('state', state.error);
+  } else if (columnsRead[state.data.kind].fields && !fields.success) {
+    shown = unreadable('fields', fields.error);
+  } else if (columnsRead[state.data.kind].input && !input.success) {
+    shown = unreadable('input', input.error);
+  } else {
+    shown = state.data;
+  }
   return {
     id: row.id as JobId,
     accountId: row.account_id as AccountId,
@@ -180,7 +173,7 @@ function unreadableJob(row: StoredRow, message: string): UploadJob {
     pageCount: row.page_count,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
-    state: { kind: 'failed', reason: { kind: 'unreadable', message } },
+    state: shown,
   };
 }
 

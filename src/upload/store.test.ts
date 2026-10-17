@@ -197,4 +197,36 @@ describe('SqliteJobStore', () => {
     expect(job.state).toEqual({ kind: 'failed', reason: { kind: 'unreadable', message: expect.any(String) } });
     expect(job.fields.title).toBe('');
   });
+
+  test('a processing row whose fields column cannot be read is unreadable, because it may still send', async () => {
+    const database = nodeDatabase(path);
+    const store = await openJobStore(database);
+    const processing: UploadState = { kind: 'processing', taskId, checks: 0, failedChecks: 0, nextCheckAt: 0, startedAt: 0 };
+    await insertRaw(database, JSON.stringify(processing), 'not json');
+
+    const [job] = await store.loadAll();
+
+    expect(job.state.kind).toBe('failed');
+  });
+
+  test('a done row keeps its state when its fields column cannot be read, because done never reads the fields', async () => {
+    const database = nodeDatabase(path);
+    const store = await openJobStore(database);
+    await insertRaw(database, '{"kind":"done","documentId":42}', 'not json');
+
+    const [job] = await store.loadAll();
+
+    expect(job.state).toEqual({ kind: 'done', documentId: 42 });
+    expect(job.fields.title).toBe('');
+  });
+
+  test('a waiting row whose fields column cannot be read is unreadable, because the send needs the fields', async () => {
+    const database = nodeDatabase(path);
+    const store = await openJobStore(database);
+    await insertRaw(database, JSON.stringify(waiting), 'not json');
+
+    const [job] = await store.loadAll();
+
+    expect(job.state).toEqual({ kind: 'failed', reason: { kind: 'unreadable', message: expect.stringContaining('fields') } });
+  });
 });
