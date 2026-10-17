@@ -6,7 +6,7 @@
 #   dev/android.sh boot          boot the waraq_pixel emulator headless, creating it if missing
 #   dev/android.sh install       install the APK on the emulator
 #   dev/android.sh shot <name>   save a screenshot as .dev-data/shots/<name>.png
-#   dev/android.sh flow          sign in on the emulator in light, dark, and large text, and once with a wrong password
+#   dev/android.sh flow          sign in, search, edit a title, and mark a document done, then the key screens in dark and large text
 #   dev/android.sh logs          print the app's log lines
 #   dev/android.sh adb <args>    run adb against this project's own adb server
 #   dev/android.sh stop          stop this emulator and its adb server, and nothing else
@@ -168,8 +168,8 @@ node_bounds() {
   adb shell uiautomator dump /sdcard/ui.xml > /dev/null 2>&1 || true
   adb shell cat /sdcard/ui.xml | tr '>' '\n' \
     | sed -nE 's/.* text="([^"]*)".* class="([^"]*)".* content-desc="([^"]*)".* bounds="\[([0-9]+),([0-9]+)\]\[([0-9]+),([0-9]+)\]".*/\1|\2|\3|\4 \5 \6 \7/p' \
-    | awk -F'|' -v label="$1" -v class="${2:-}" \
-      '($1 == label || $3 == label) && (class == "" || $2 == class) { print $4; exit }'
+    | awk -F'|' -v label="$1" -v class="${2:-}" -v only="${3:-}" \
+      '((only != "description" && $1 == label) || $3 == label) && (class == "" || $2 == class) { print $4; exit }'
 }
 
 wait_for() {
@@ -186,7 +186,7 @@ wait_for() {
 
 tap() {
   local bounds
-  bounds=$(node_bounds "$1" "${2:-}")
+  bounds=$(node_bounds "$1" "${2:-}" "${3:-}")
   if [ -z "$bounds" ]; then
     echo "no node labelled \"$1\"" >&2
     return 1
@@ -198,6 +198,14 @@ tap() {
 type_into() {
   tap "$1" android.widget.EditText
   adb shell input text "$2"
+}
+
+scroll_to_top() {
+  local swipe
+  for swipe in 1 2 3; do
+    adb shell input swipe 540 900 540 1900 300
+  done
+  sleep 1
 }
 
 scroll_to() {
@@ -242,16 +250,162 @@ see_inbox() {
 }
 
 
+tap_by_description() {
+  tap "$1" "" description
+}
+
+press_back() {
+  adb shell input keyevent KEYCODE_BACK
+  sleep 1
+}
+
+open_september_bill() {
+  local run=$1
+  tap_by_description "Documents"
+  wait_for "Search documents" 20
+  wait_for "Electricity bill, August" 20
+  shot "$run-5-documents"
+  tap "Search documents"
+  sleep 1
+  adb shell input text hydro
+  wait_for "Suggestions" 10
+  shot "$run-6-search-typing"
+  adb shell input keyevent KEYCODE_ENTER
+  wait_for "Best match" 20
+  wait_for "Electricity bill, September" 20
+  shot "$run-7-search-results"
+  tap "Electricity bill, September"
+  wait_for "Details" 20
+  sleep 2
+  shot "$run-8-document"
+}
+
+see_document_extras() {
+  local run=$1
+  tap "More"
+  wait_for "Download" 5
+  shot "$run-9-document-menu"
+  press_back
+  scroll_to "Text found in the document"
+  shot "$run-10-document-scrolled"
+}
+
+edit_title() {
+  local run=$1
+  tap "Edit"
+  wait_for "Edit details" 10
+  shot "$run-11-edit"
+  tap "Add a tag"
+  wait_for "Search" 10
+  shot "$run-11-tag-picker"
+  tap "Close"
+  wait_for "Edit details" 10
+  tap "Title" android.widget.EditText
+  adb shell input keyevent KEYCODE_MOVE_END
+  adb shell input text "%s2026"
+  wait_for "Save 1 change" 5
+  shot "$run-12-edit-changed"
+  tap "Save 1 change"
+  wait_for "Electricity bill, September 2026" 20
+  shot "$run-13-document-saved"
+}
+
+done_and_undo() {
+  local run=$1
+  press_back
+  tap_by_description "Inbox"
+  scroll_to_top
+  wait_for "Done with Interest income slip" 20
+  tap "Done with Interest income slip"
+  wait_for "Marked done. Inbox tag removed." 5
+  shot "$run-14-inbox-done"
+  tap "Undo"
+  wait_for "Done with Interest income slip" 20
+  shot "$run-15-inbox-undone"
+}
+
+see_filters() {
+  local run=$1
+  tap_by_description "Documents"
+  wait_for "Filters" 20
+  tap "Filters"
+  wait_for "Has all" 10
+  shot "$run-16-filters"
+  press_back
+}
+
+restore_seed_data() {
+  python3 - "http://localhost:8010" << 'EOF'
+import base64, json, sys, urllib.parse, urllib.request
+
+server = sys.argv[1]
+auth = base64.b64encode(b'admin:waraq-dev-password').decode()
+
+def call(method, path, body=None):
+    request = urllib.request.Request(
+        f'{server}/api/{path}',
+        method=method,
+        data=None if body is None else json.dumps(body).encode(),
+        headers={'Authorization': f'Basic {auth}', 'Accept': 'application/json; version=10', 'Content-Type': 'application/json'},
+    )
+    with urllib.request.urlopen(request) as response:
+        return json.loads(response.read() or 'null')
+
+def documents(title_start):
+    query = urllib.parse.urlencode({'title__istartswith': title_start, 'fields': 'id,title,tags'})
+    return call('GET', f'documents/?{query}')['results']
+
+for document in documents('Electricity bill, September'):
+    call('PATCH', f"documents/{document['id']}/", {'title': 'Electricity bill, September'})
+
+inbox = [tag['id'] for tag in call('GET', 'tags/?page_size=1000')['results'] if tag['is_inbox_tag']]
+for document in documents('Interest income slip'):
+    missing = [tag for tag in inbox if tag not in document['tags']]
+    if missing:
+        call('PATCH', f"documents/{document['id']}/", {'tags': document['tags'] + missing})
+
+tags = {tag['name']: tag['id'] for tag in call('GET', 'tags/?page_size=1000')['results']}
+views = {view['name'] for view in call('GET', 'saved_views/')['results']}
+for name in ['Bills', 'School', 'Tax']:
+    if name not in views and name in tags:
+        call('POST', 'saved_views/', {
+            'name': name, 'sort_field': 'created', 'sort_reverse': True,
+            'filter_rules': [{'rule_type': 6, 'value': str(tags[name])}],
+        })
+EOF
+}
+
 reset_display() {
   adb shell cmd uimode night no > /dev/null
   adb shell settings put system font_scale 1.0
 }
 
+key_screens() {
+  local run=$1
+  see_inbox "$run"
+  open_september_bill "$run"
+  tap "Edit"
+  wait_for "Edit details" 10
+  shot "$run-11-edit"
+  tap "Cancel"
+  wait_for "Details" 10
+  see_document_extras "$run"
+  tap "Back"
+  see_filters "$run"
+}
+
 flow() {
   trap reset_display EXIT
   reset_display
+  restore_seed_data
 
   see_inbox light
+  open_september_bill light
+  edit_title light
+  see_document_extras light
+  done_and_undo light
+  see_filters light
+  restore_seed_data
 
   sign_in wrong-password not-the-password
   wait_for "Here is how far the connection got." 20
@@ -261,11 +415,11 @@ flow() {
   # Paperless-ngx allows five sign-in requests a minute from one address, and each run makes two.
   sleep 61
   adb shell cmd uimode night yes > /dev/null
-  see_inbox dark
+  key_screens dark
   reset_display
 
   adb shell settings put system font_scale 1.3
-  see_inbox large-text
+  key_screens large-text
   echo "flow passed, screenshots in $SHOTS"
 }
 
