@@ -405,13 +405,15 @@ flowchart LR
 | Parsing | Zod | Server responses are parsed into the app's own types at the boundary. One response that changes shape breaks one row, not the screen. |
 | Scanner | ML Kit document scanner, through a small module of our own | Daftar proved it on the emulator and on the owner's phone. See "Shared with Daftar". |
 | Thumbnails | expo-image | Sends the auth headers, keeps a disk cache. |
-| PDF viewer | react-native-pdf, plus "Open with" another app | Reads a local file. |
+| PDF viewer | The phone's own PDF app, handed the downloaded file by expo-file-system | No PDF library in the app, and no second HTTP client. The file is written to the cache folder from the shared fetch. |
+| Dates | @react-native-community/datetimepicker | Android's own date dialog. It runs in UTC, so a picked day never moves. |
+| Share | expo-sharing | Android's share sheet for a downloaded file. |
 | UI | Own components on a small theme, React Native's accessibility props | The candidates for a shadcn-style kit on React Native are untested on SDK 58. The choice comes after the owner picks a direction. |
 | Unit and integration tests | Vitest | On the owner's resume. |
 | End-to-end | Maestro | Drives the app on the emulator from a YAML flow. Open source. |
 | Background | expo-background-task | The queue's backstop when the app is closed. |
 
-Added outside the resume list, with the reason: Expo and its modules (the owner asked for React Native), Zod (parsing at the boundary), netinfo (online state), react-native-pdf (viewing), Maestro (end-to-end on Android).
+Added outside the resume list, with the reason: Expo and its modules (the owner asked for React Native), Zod (parsing at the boundary), netinfo (online state), datetimepicker (dates), expo-sharing (share sheet), Maestro (end-to-end on Android).
 
 ## Tests
 

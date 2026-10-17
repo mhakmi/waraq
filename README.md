@@ -10,10 +10,14 @@ Waraq needs Paperless-ngx 3.0 or newer. It talks to the REST API at version 10.
 - `src/paperless/` is the API client. It uses the `fetch` it is given, and parses every response with Zod before the rest of the app sees it. Zod is the one dependency added for that.
 - `src/signin/` holds the sign-in steps and the checklist that a failed sign-in shows. It is plain TypeScript, so the tests run it in Node.
 - `src/account/` stores the one account. The address, user, and server version go in SQLite. The token and the custom header values go in the Android Keystore through expo-secure-store.
+- `src/documents/` turns the filter sheet and the server's saved views into list parameters, and works out which fields an edit changed. `src/inbox/` groups the inbox and removes a row when it is marked done. Both are plain TypeScript.
+- `src/cache/` names every TanStack Query key and saves the cache to SQLite. `src/files/` keeps opened documents in the cache folder.
 - `src/upload/` holds the upload job. Each scanned document becomes one job, and a table in `machine.ts` lists every state change the job allows. `runStep` in `runner.ts` is the only code in that folder that talks to the server or the disk.
 - `src/copy.ts` holds every word the app shows. Screens take their text from it.
 - `plugins/network-security.ts` writes Android's network security config. It trusts certificate authorities that the user installed, and allows plain HTTP, which `normalizeServerUrl` then allows only for addresses on a home network or VPN.
 - `src/brand.json` holds the app name, slug, and Android package. Change them there.
+
+Four libraries came in with the document screens. `@tanstack/react-query-persist-client` saves the query cache. `@react-native-community/datetimepicker` opens Android's date dialog. `expo-file-system` writes downloaded files and hands them to the phone's PDF app. `expo-sharing` opens the share sheet. None of them adds an Android permission.
 
 ## How sign-in works
 
@@ -60,11 +64,35 @@ dev/android.sh build       # the APK, then its package, SDK levels, and permissi
 dev/android.sh boot
 dev/android.sh install
 dev/android.sh shot inbox  # .dev-data/shots/inbox.png
-dev/android.sh flow        # signs in to http://10.0.2.2:8010 in light, dark, and large text, and once with a wrong password
+dev/android.sh flow        # the documents flow against http://10.0.2.2:8010, described below
 dev/android.sh logs
 dev/android.sh adb devices # any adb command, against port 5038
 dev/android.sh stop        # this emulator and its adb server only
 ```
+
+`dev/android.sh flow` signs in to the dev server on port 8010. It searches for "hydro", opens the September bill, adds " 2026" to its title, and saves. Then it marks the interest slip done in the inbox and taps Undo. It takes a screenshot at each step, then shows the key screens again in dark mode and at font scale 1.3. Before and after the light run, it puts the title and the inbox tag back through the API. It also adds the saved views Bills, School, and Tax if they are missing.
+
+## How the document screens get their data
+
+Every list and detail goes through TanStack Query. The app saves its cache to SQLite through `expo-sqlite/kv-store` a second after each change. On the next start, the Inbox, Documents, and any document opened before show at once. While the phone has no network, they say "Offline, showing saved copy". Suggestions, search results, and the counts in the filter sheet are not saved. The cache is dropped on sign-out.
+
+```mermaid
+flowchart LR
+  screens["Inbox, Documents,<br>document page"] --> query["TanStack Query"]
+  query --> client["Paperless client"]
+  client --> fetch["expo/fetch<br>shared OkHttp"]
+  query <--> saved[("SQLite<br>saved cache")]
+  page["document page"] --> files["src/files<br>download.ts"]
+  files --> fetch
+  files --> folder[("cache folder<br>opened/, 200 MB")]
+  folder --> viewer["another app<br>open, share"]
+```
+
+- **Filters and saved views.** `documentQuery` turns the search text, the filter sheet, and the sort into query parameters. A saved view's rules become parameters through the same rule table that the Paperless-ngx web app uses. The filter sheet and the sort win where both set one.
+- **Edits.** The edit page sends `PATCH /api/documents/<id>/` with only the fields that differ from the document as it was opened. Dates are `YYYY-MM-DD` strings. The date picker runs in UTC, so a picked day is stored as that day in every time zone.
+- **Done in the inbox.** Done sends one `PATCH` with the document's tags minus the inbox tags. The row leaves the list at once and comes back where it was if the request fails or the user taps Undo.
+- **Opening a file.** The app downloads the file through the same `expo/fetch` as every other request and writes the body to the cache folder chunk by chunk, so a 20 MB PDF never sits whole in memory. Android then hands the file to the user's PDF app, or to the share sheet. Opened files stay in `opened/` up to 200 MB. Past that, the oldest go first.
+- **Missing permissions.** A label list, the notes, or the saved views that answer 403 hide their part of the screen. The rest keeps working.
 
 ## How an upload moves
 
