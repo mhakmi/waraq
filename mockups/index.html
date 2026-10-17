@@ -1,0 +1,895 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Waraq screens</title>
+<link rel="stylesheet" href="shared/theme.css">
+<style>
+.board-head { padding-block: 28px 8px; padding-inline: 32px; }
+.board-head h1 { margin: 0; font-size: 26px; font-weight: 600; }
+.board-head p { margin-block: 6px 0; font-size: 16px; }
+.board-head .direction { font-weight: 600; }
+.board-row { padding-block: 20px 12px; padding-inline: 32px; }
+.board-row > h2 { margin-block: 0 14px; font-size: 19px; font-weight: 600; }
+.frames { display: flex; gap: 28px; align-items: flex-start; }
+.frame-label { block-size: 48px; display: flex; flex-direction: column; justify-content: flex-end; padding-block-end: 8px; padding-inline-start: 4px; }
+.frame-label b { font-size: 16px; font-weight: 600; }
+.frame-label span { font-size: 14px; opacity: 0.8; }
+
+.forks { padding-block: 28px 48px; padding-inline: 32px; max-inline-size: 1500px; }
+.forks h2 { margin-block: 0 16px; font-size: 22px; }
+.fork { margin-block-end: 24px; }
+.fork h3 { margin-block: 0 10px; font-size: 18px; }
+.fork-options { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.fork-option { padding: 18px 20px; border-radius: 14px; background: var(--surface-raised); color: var(--ink); border: 1px solid var(--line); font-size: 15.5px; line-height: 1.5; }
+.fork-option.current { box-shadow: inset 0 0 0 2px var(--accent); }
+.fork-option h4 { margin: 0 0 8px; font-size: 16.5px; }
+.fork-option p { margin-block: 6px 0; }
+
+/* Screen pieces used only on this page */
+.wordmark { display: flex; align-items: center; gap: 10px; color: var(--accent); font-size: calc(22 * var(--sp)); font-weight: 700; padding-block: 28px 32px; }
+.wordmark .icon { inline-size: 30px; block-size: 30px; }
+.screen-heading { margin: 0; font-size: calc(28 * var(--sp)); font-weight: 500; line-height: 1.25; }
+.lead { margin-block: 8px 28px; color: var(--ink-muted); font-size: calc(16 * var(--sp)); }
+.stack { display: flex; flex-direction: column; gap: 16px; }
+.options-card { margin-block-start: 24px; }
+.options-row { display: flex; align-items: center; gap: 12px; min-block-size: 64px; padding-block: 10px; padding-inline: 16px 8px; }
+.options-row .main { flex: 1; min-inline-size: 0; }
+.options-row .sub { display: block; font-size: calc(13.5 * var(--sp)); color: var(--ink-muted); }
+.options-body { padding-block: 4px 16px; padding-inline: 16px; border-block-start: 1px solid var(--line); display: flex; flex-direction: column; gap: 12px; }
+.options-body h3 { margin-block: 12px 0; font-size: calc(15 * var(--sp)); font-weight: 600; }
+.header-pair { display: flex; gap: 8px; }
+.header-pair .input { flex: 1; min-inline-size: 0; font-size: calc(14 * var(--sp)); padding-inline-end: 10px; }
+.soon { display: inline-flex; padding-block: 2px; padding-inline: 8px; border-radius: 6px; background: var(--surface-sunken); font-size: calc(12.5 * var(--sp)); font-weight: 500; }
+.found { display: flex; gap: 12px; align-items: center; padding-block: 12px; padding-inline: 16px 8px; border-radius: 12px; background: var(--success-soft); margin-block-end: 24px; }
+.found .icon { color: var(--success); }
+.found .main { flex: 1; min-inline-size: 0; }
+.found .button { color: var(--ink); text-decoration: underline; text-underline-offset: 3px; padding-inline: 10px; }
+.notice { display: flex; gap: 10px; align-items: flex-start; padding: 12px 14px; border-radius: 12px; background: var(--accent-soft); color: var(--on-accent-soft); font-size: calc(14.5 * var(--sp)); }
+.center { text-align: center; }
+
+.checklist { list-style: none; margin: 0; padding: 0; }
+.checklist li { display: flex; gap: 14px; padding-block: 14px; padding-inline: 16px; }
+.checklist li + li { border-block-start: 1px solid var(--line); }
+.checklist .main { flex: 1; min-inline-size: 0; display: flex; flex-direction: column; gap: 2px; }
+.checklist .name { font-weight: 500; }
+.checklist .detail { font-size: calc(14 * var(--sp)); color: var(--ink-muted); }
+.checklist .passed .icon { color: var(--success); }
+.checklist .failed { background: var(--danger-soft); }
+.checklist .failed .icon, .checklist .failed .name { color: var(--danger); }
+.checklist .failed .detail { color: var(--ink); }
+.checklist .skipped { color: var(--ink-muted); }
+.checklist .fix { margin-block-start: 6px; font-size: calc(14 * var(--sp)); font-weight: 500; }
+.checklist .button { align-self: flex-start; margin-block-start: 8px; }
+
+.home-head { flex: none; display: flex; flex-direction: column; gap: 12px; padding-block: 8px 12px; padding-inline: 16px; }
+.toolbar-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; padding-inline: 20px 8px; min-block-size: 48px; }
+.toolbar-row .doc-meta { font-weight: 500; }
+.sort { display: inline-flex; align-items: center; gap: 6px; min-block-size: 48px; padding-inline: 12px; color: var(--ink); font-weight: 500; font-size: calc(14 * var(--sp)); }
+.hint-line { padding-block: 0 4px; padding-inline: 20px; font-size: calc(13.5 * var(--sp)); color: var(--ink-muted); }
+
+.suggestion { display: flex; align-items: center; gap: 16px; min-block-size: 56px; padding-inline: 20px; }
+.suggestion .icon { color: var(--ink-muted); }
+.suggestion .main { flex: 1; min-inline-size: 0; }
+.suggestion .sub { display: block; font-size: calc(13 * var(--sp)); color: var(--ink-muted); }
+.keyboard { flex: none; background: var(--surface-sunken); padding-block: 10px 8px; padding-inline: 4px; display: flex; flex-direction: column; gap: 10px; }
+.key-row { display: flex; justify-content: center; gap: 5px; }
+.key { inline-size: 35px; block-size: 44px; border-radius: 6px; background: var(--surface-raised); display: grid; place-items: center; font-size: 19px; color: var(--ink); }
+.key.wide { inline-size: 56px; font-size: 14px; }
+.key.space { inline-size: 196px; }
+.key.action { background: var(--accent); color: var(--on-accent); }
+
+.sheet-head { display: flex; align-items: center; justify-content: space-between; padding-inline: 20px 8px; min-block-size: 56px; }
+.sheet-head h2 { margin: 0; font-size: calc(20 * var(--sp)); font-weight: 500; }
+.sheet-body { flex: 1; min-block-size: 0; overflow: hidden; padding-inline: 20px; display: flex; flex-direction: column; gap: 18px; padding-block: 4px 16px; }
+.sheet-foot { flex: none; display: flex; gap: 10px; flex-wrap: wrap; padding-block: 12px; padding-inline: 16px; border-block-start: 1px solid var(--line); }
+.sheet-foot .button { flex: 1 1 auto; white-space: nowrap; }
+.two { display: flex; gap: 10px; }
+.two > * { flex: 1; min-inline-size: 0; }
+.chip .icon.small { margin-inline-end: -4px; }
+
+.preview { margin-block: 4px 0; margin-inline: 20px; position: relative; }
+.preview .paper { inline-size: 100%; aspect-ratio: 8.5 / 11; max-block-size: 360px; padding: 28px 26px; font-size: 11px; line-height: 1.5; }
+.preview .paper h3 { margin: 0 0 6px; font-size: 15px; }
+.preview .paper .meta { color: #555; margin: 0 0 10px; }
+.preview .paper p { margin: 0 0 10px; }
+.preview .open-hint { position: absolute; inset-block-end: 12px; inset-inline-end: 12px; display: inline-flex; align-items: center; gap: 6px; padding-block: 6px; padding-inline: 12px; border-radius: 999px; background: var(--snackbar); color: var(--on-snackbar); font-size: calc(13 * var(--sp)); font-weight: 500; }
+.doc-heading { display: flex; align-items: flex-start; gap: 12px; padding-block: 20px 4px; padding-inline: 20px 12px; }
+.doc-heading h2 { margin: 0; flex: 1; min-inline-size: 0; font-size: calc(22 * var(--sp)); font-weight: 500; line-height: 1.3; }
+.detail-row { display: flex; gap: 12px; padding-block: 12px; padding-inline: 20px; border-block-start: 1px solid var(--line); align-items: baseline; flex-wrap: wrap; }
+.detail-row .label { flex: 0 0 130px; color: var(--ink-muted); font-size: calc(14 * var(--sp)); }
+.detail-row .value { flex: 1 1 160px; min-inline-size: 0; }
+.note { margin-block: 0 12px; margin-inline: 20px; padding: 14px 16px; }
+.note .by { display: block; font-size: calc(13 * var(--sp)); color: var(--ink-muted); margin-block-end: 4px; }
+.note-add { margin-inline: 20px; }
+.collapsed-row { display: flex; align-items: center; gap: 12px; min-block-size: 56px; margin-block: 20px 24px; margin-inline: 20px; padding-inline: 16px 10px; }
+.collapsed-row .main { flex: 1; font-weight: 500; }
+.edit-body { padding-block: 8px 24px; padding-inline: 20px; display: flex; flex-direction: column; gap: 18px; }
+.changed-mark { color: var(--accent); font-weight: 600; }
+
+.scanner-screen { background: var(--scanner); color: var(--on-scanner); }
+.scanner-box { position: absolute; inset: 40px 28px 60px; border: 2px dashed currentColor; border-radius: 20px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; padding: 24px; text-align: center; opacity: 0.9; }
+.scanner-box strong { font-size: calc(22 * var(--sp)); font-weight: 500; }
+.scanner-box p { margin: 0; font-size: calc(15 * var(--sp)); }
+.scanner-box .icon { inline-size: 44px; block-size: 44px; }
+
+.batch-card { margin-block: 0 14px; padding: 14px 16px 16px; }
+.batch-card-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-block-end: 12px; }
+.batch-card-head b { font-size: calc(16 * var(--sp)); font-weight: 600; }
+.batch-card-head .doc-meta { flex: 1; }
+.page-strip { display: flex; gap: 10px; }
+.page-strip .paper { inline-size: 66px; block-size: 88px; }
+.page-strip.small .paper { inline-size: 42px; block-size: 56px; }
+.batch-actions { display: flex; flex-direction: column; gap: 10px; margin-block: 6px 16px; }
+.batch-scroll { padding-block: 8px 16px; padding-inline: 16px; }
+
+.pages { display: grid; grid-template-columns: 1fr 52px 1fr; align-items: start; padding-block: 16px; padding-inline: 20px; }
+.page-tile { display: flex; flex-direction: column; align-items: center; gap: 8px; }
+.page-tile .paper-wrap { position: relative; inline-size: 100%; }
+.page-tile .paper { inline-size: 100%; aspect-ratio: 3 / 4; }
+.page-tile .grip, .page-tile .page-more { position: absolute; inset-block-start: 4px; inline-size: 40px; block-size: 40px; display: grid; place-items: center; border-radius: 10px; background: var(--surface-raised); color: var(--ink); box-shadow: 0 1px 3px rgb(0 0 0 / 0.2); }
+.page-tile .grip { inset-inline-start: 4px; }
+.page-tile .page-more { inset-inline-end: 4px; }
+.page-tile .page-more.open { background: var(--accent); color: var(--on-accent); }
+.page-tile > span { font-size: calc(14 * var(--sp)); font-weight: 500; }
+.page-menu { inset-block-start: 48px; inset-inline-start: 40%; min-inline-size: 260px; }
+.seam { align-self: stretch; position: relative; display: grid; place-items: center; }
+.seam::before { content: ""; position: absolute; inset-block: 8px 40px; inset-inline-start: 25px; border-inline-start: 2px dashed var(--line); }
+.seam .split { position: relative; inline-size: 44px; block-size: 48px; border-radius: 22px; display: grid; place-items: center; background: var(--surface-raised); border: 1px solid var(--line); color: var(--ink); margin-block-end: 32px; }
+.seam-row { grid-column: 1 / -1; display: flex; align-items: center; gap: 8px; padding-block: 12px; }
+.seam-row::before, .seam-row::after { content: ""; flex: 1; border-block-start: 2px dashed var(--line); }
+.split-bar { display: inline-flex; align-items: center; gap: 8px; min-block-size: 48px; padding-inline: 16px; border-radius: 24px; background: var(--accent-soft); color: var(--on-accent-soft); font-size: calc(14.5 * var(--sp)); font-weight: 500; }
+
+.field-row { display: flex; align-items: center; gap: 12px; min-block-size: 56px; padding-block: 8px; padding-inline: 16px 12px; border-block-start: 1px solid var(--line); flex-wrap: wrap; }
+.field-row .label { flex: 0 0 120px; color: var(--ink-muted); font-size: calc(14 * var(--sp)); }
+.field-row .value { flex: 1 1 150px; min-inline-size: 0; display: flex; flex-direction: column; gap: 2px; }
+.from-batch { font-size: calc(12.5 * var(--sp)); color: var(--ink-muted); }
+.inherited { color: var(--ink-muted); }
+.own { font-size: calc(12.5 * var(--sp)); color: var(--accent); font-weight: 500; }
+.shared-card { margin-block: 0 8px; }
+.doc-card { margin-block: 12px 0; }
+.doc-card-head { display: flex; align-items: center; gap: 12px; padding-block: 14px 10px; padding-inline: 16px; flex-wrap: wrap; }
+.doc-card-head .paper { inline-size: 32px; block-size: 42px; }
+.doc-card-head b { font-weight: 600; }
+.doc-card .title-input { padding-block: 0 12px; padding-inline: 16px; }
+
+.pager-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding-block: 0 12px; padding-inline: 20px; flex-wrap: wrap; }
+.dots { display: flex; gap: 8px; }
+.dots i { inline-size: 10px; block-size: 10px; border-radius: 5px; background: var(--line); }
+.dots i.current { inline-size: 24px; background: var(--accent); }
+.pager-fields { display: flex; flex-direction: column; gap: 14px; padding-block: 16px 20px; padding-inline: 20px; }
+.use-all { display: flex; align-items: center; gap: 12px; min-block-size: 48px; justify-content: space-between; font-size: calc(14 * var(--sp)); }
+
+.upload-group { margin-block-end: 8px; }
+.upload-row { display: flex; gap: 14px; padding-block: 12px; padding-inline: 20px 12px; align-items: flex-start; }
+.upload-row + .upload-row { border-block-start: 1px solid var(--line); }
+.upload-row .main { flex: 1; min-inline-size: 0; display: flex; flex-direction: column; gap: 4px; }
+.upload-row .thumb { inline-size: 40px; block-size: 53px; }
+.upload-row .reason { font-size: calc(13.5 * var(--sp)); color: var(--ink); }
+.upload-row .button { align-self: center; }
+.progress-line { display: flex; align-items: center; gap: 10px; }
+.progress-line .progress { flex: 1; }
+.progress-line span { font-size: calc(13 * var(--sp)); color: var(--ink-muted); }
+
+.account { display: flex; gap: 14px; align-items: center; margin-block: 8px 0; margin-inline: 16px; padding: 16px; flex-wrap: wrap; }
+.account .avatar { inline-size: 52px; block-size: 52px; font-size: 22px; }
+.account .main { flex: 1 1 180px; min-inline-size: 0; }
+.account .sub { display: block; font-size: calc(14 * var(--sp)); color: var(--ink-muted); }
+.settings-card { margin-inline: 16px; overflow: hidden; }
+.settings-card .list-row { padding-inline: 16px 12px; }
+.theme-pick { padding: 12px 16px 16px; }
+.about { padding-block: 0 16px; padding-inline: 16px; font-size: calc(14 * var(--sp)); color: var(--ink-muted); }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script src="shared/data.js"></script>
+<script>
+const data = window.WARAQ;
+const copy = data.copy;
+
+const ICONS = {
+	search: '<circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/>',
+	filters: '<path d="M4 7h9M17 7h3M4 12h3M11 12h9M4 17h11M19 17h1"/><circle cx="15" cy="7" r="2"/><circle cx="9" cy="12" r="2"/><circle cx="17" cy="17" r="2"/>',
+	sort: '<path d="M7 4v16M3.5 16.5 7 20l3.5-3.5M17 20V4M13.5 7.5 17 4l3.5 3.5"/>',
+	check: '<path d="m5 12.5 4.5 4.5L19 7.5"/>',
+	back: '<path d="M19 12H5M11 18l-6-6 6-6"/>',
+	close: '<path d="M6 6l12 12M18 6 6 18"/>',
+	more: '<circle cx="12" cy="5.5" r="1.3" fill="currentColor"/><circle cx="12" cy="12" r="1.3" fill="currentColor"/><circle cx="12" cy="18.5" r="1.3" fill="currentColor"/>',
+	share: '<circle cx="18" cy="5.5" r="2.5"/><circle cx="6" cy="12" r="2.5"/><circle cx="18" cy="18.5" r="2.5"/><path d="m8.2 10.8 7.6-4.1M8.2 13.2l7.6 4.1"/>',
+	openWith: '<path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/>',
+	download: '<path d="M12 4v11M7 10l5 5 5-5M5 20h14"/>',
+	trash: '<path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/>',
+	plus: '<path d="M12 5v14M5 12h14"/>',
+	scan: '<path d="M4 8V6a2 2 0 0 1 2-2h2M16 4h2a2 2 0 0 1 2 2v2M20 16v2a2 2 0 0 1-2 2h-2M8 20H6a2 2 0 0 1-2-2v-2M7 12h10"/>',
+	inbox: '<path d="M4 13 6.5 5h11L20 13v6H4z"/><path d="M4 13h4.5a3.5 3.5 0 0 0 7 0H20"/>',
+	documents: '<path d="M14 3H7a1 1 0 0 0-1 1v16a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1V7z"/><path d="M14 3v4h4M9 12h6M9 16h6"/>',
+	upload: '<path d="M12 20V9M7 13l5-5 5 5M5 4h14"/>',
+	chevronDown: '<path d="m6 9 6 6 6-6"/>',
+	chevronRight: '<path d="m9 6 6 6-6 6"/>',
+	grip: '<circle cx="9" cy="6" r="1.2" fill="currentColor"/><circle cx="15" cy="6" r="1.2" fill="currentColor"/><circle cx="9" cy="12" r="1.2" fill="currentColor"/><circle cx="15" cy="12" r="1.2" fill="currentColor"/><circle cx="9" cy="18" r="1.2" fill="currentColor"/><circle cx="15" cy="18" r="1.2" fill="currentColor"/>',
+	rotate: '<path d="M20 12a8 8 0 1 1-2.3-5.6M20 4v5h-5"/>',
+	camera: '<path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/>',
+	move: '<path d="M4 12h15M14 7l5 5-5 5"/>',
+	scissors: '<circle cx="6" cy="7" r="2.5"/><circle cx="6" cy="17" r="2.5"/><path d="M8.2 8.4 20 17M8.2 15.6 20 7"/>',
+	copy: '<rect x="8" y="8" width="12" height="12" rx="1.5"/><path d="M16 8V5a1 1 0 0 0-1-1H5a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h3"/>',
+	offline: '<path d="M3 3l18 18M8.5 16.5a5 5 0 0 1 7 0M4.5 12.5a10 10 0 0 1 4.5-2.6M19.5 12.5a10 10 0 0 0-3-2.1M2 8.5A15 15 0 0 1 6 6M22 8.5A15 15 0 0 0 11 4.6"/><circle cx="12" cy="20" r="0.8" fill="currentColor"/>',
+	alert: '<circle cx="12" cy="12" r="9"/><path d="M12 7.5v5.5"/><circle cx="12" cy="16.5" r="0.8" fill="currentColor"/>',
+	passed: '<circle cx="12" cy="12" r="9"/><path d="m8 12.5 3 3 5-6"/>',
+	failed: '<circle cx="12" cy="12" r="9"/><path d="m9 9 6 6M15 9l-6 6"/>',
+	skipped: '<circle cx="12" cy="12" r="9" stroke-dasharray="3 3.1"/>',
+	clock: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
+	server: '<rect x="4" y="4" width="16" height="7" rx="1.5"/><rect x="4" y="13" width="16" height="7" rx="1.5"/><circle cx="8" cy="7.5" r="0.8" fill="currentColor"/><circle cx="8" cy="16.5" r="0.8" fill="currentColor"/>',
+	pencil: '<path d="M4 20h4L19 9l-4-4L4 16z"/><path d="m13 7 4 4"/>',
+	eye: '<path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/>',
+	key: '<circle cx="8" cy="15" r="4"/><path d="m11 12 9-9M16 7l3 3"/>',
+	history: '<path d="M3.5 12a8.5 8.5 0 1 0 2.5-6M3 4v4h4M12 8v4l3 2"/>',
+	tag: '<path d="M3 12V4h8l9 9-8 8z"/><circle cx="7.5" cy="8.5" r="1.3"/>',
+	person: '<circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/>',
+	shield: '<path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z"/>',
+	bug: '<rect x="7" y="8" width="10" height="12" rx="5"/><path d="M12 11v9M4 14h3M17 14h3M5 9l2.5 1.5M19 9l-2.5 1.5M9 5l1.5 2.5M15 5l-1.5 2.5"/>',
+	info: '<circle cx="12" cy="12" r="9"/><path d="M12 11v6"/><circle cx="12" cy="7.5" r="0.8" fill="currentColor"/>',
+	signIn: '<path d="M14 4h5v16h-5M10 8l4 4-4 4M14 12H3"/>',
+	mark: '<path d="M7 3h8l4 4v12a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z"/><path d="M15 3v4h4M8.5 12h7M8.5 16h5"/>',
+};
+
+function icon(name, size = '') {
+	return `<svg class="icon ${size}" viewBox="0 0 24 24" aria-hidden="true">${ICONS[name]}</svg>`;
+}
+
+function iconButton(name, label) {
+	return `<span class="icon-button" role="button" aria-label="${label}">${icon(name)}</span>`;
+}
+
+function formatDate(isoDate) {
+	return new Date(isoDate + 'T12:00:00').toLocaleDateString('en-CA', { month: 'short', day: 'numeric', year: 'numeric' });
+}
+
+function documentById(id) {
+	return data.documents.find((document) => document.id === id);
+}
+
+function isInInbox(document) {
+	return document.tags.some((tag) => data.inboxTags.includes(tag));
+}
+
+function inboxGroup(document) {
+	const days = (new Date(data.today) - new Date(document.added)) / 86400000;
+	if (days < 1) {
+		return 'today';
+	}
+	if (days < 7) {
+		return 'week';
+	}
+	return 'earlier';
+}
+
+function uploadState(item, offline) {
+	if (offline && item.state === 'sending') {
+		return 'waiting';
+	}
+	return item.state;
+}
+
+function uploadCounts(offline) {
+	const counts = { sending: 0, processing: 0, waiting: 0, unfinished: 0 };
+	for (const group of data.uploads) {
+		for (const item of group.items) {
+			const state = uploadState(item, offline);
+			if (state in counts) {
+				counts[state] += 1;
+			}
+			if (state !== 'done') {
+				counts.unfinished += 1;
+			}
+		}
+	}
+	return counts;
+}
+
+// Frame pieces
+
+function phone(screen, className = '') {
+	return `<div class="phone ${className}">
+		<div class="status-bar"><span>${data.system.time}</span><span class="status-icons">
+			<svg viewBox="0 0 16 16"><path d="M8 13.5 1 6a10 10 0 0 1 14 0z"/></svg>
+			<svg viewBox="0 0 16 16"><path d="M2 14h2v-3H2zM6 14h2V8H6zM10 14h2V5h-2zM14 14h0V2h0z"/><path d="M14 14h1V2h-1z"/></svg>
+			<svg viewBox="0 0 16 16"><rect x="5" y="1.5" width="6" height="13" rx="1.5"/></svg>
+		</span></div>
+		<div class="screen">${screen}</div>
+		<div class="gesture-bar"></div>
+	</div>`;
+}
+
+function paper(className = '') {
+	return `<div class="paper lines ${className}"></div>`;
+}
+
+function tagList(tags) {
+	return tags.map((tag) => `<span class="tag ${data.inboxTags.includes(tag) ? 'inbox' : ''}">${tag}</span>`).join('');
+}
+
+function documentRow(document, withDone) {
+	const action = withDone
+		? `<span class="button outline compact row-action">${icon('check', 'small')}${copy.inbox.done}</span>`
+		: '';
+	return `<div class="doc-row">
+		${paper('thumb')}
+		<div class="doc-main">
+			<span class="doc-title">${document.title}</span>
+			<span class="doc-meta">${document.correspondent} · ${formatDate(document.created)}</span>
+			<span class="doc-tags">${tagList(document.tags)}</span>
+		</div>
+		${action}
+	</div>`;
+}
+
+function inboxList(hiddenId) {
+	const documents = data.documents
+		.filter((document) => isInInbox(document) && document.id !== hiddenId)
+		.sort((first, second) => second.added.localeCompare(first.added));
+	let html = '';
+	for (const group of Object.keys(copy.inbox.groups)) {
+		const inGroup = documents.filter((document) => inboxGroup(document) === group);
+		if (inGroup.length === 0) {
+			continue;
+		}
+		html += `<div class="group-head">${copy.inbox.groups[group]}</div>`;
+		html += inGroup.map((document) => documentRow(document, true)).join('');
+	}
+	return html;
+}
+
+function allDocumentsList() {
+	return [...data.documents]
+		.sort((first, second) => second.created.localeCompare(first.created))
+		.map((document) => documentRow(document, false))
+		.join('');
+}
+
+function inboxCount(hiddenId = null) {
+	return data.documents.filter((document) => isInInbox(document) && document.id !== hiddenId).length;
+}
+
+function avatarButton() {
+	return `<span class="icon-button" role="button" aria-label="${copy.shell.account}"><span class="avatar">${data.user.initial}</span></span>`;
+}
+
+function searchField() {
+	return `<div class="search-field">${icon('search')}<span class="value">${copy.shell.searchPlaceholder}</span>${avatarButton()}</div>`;
+}
+
+function viewChips() {
+	const views = data.savedViews.map((view) => `<span class="chip">${view}</span>`).join('');
+	return `<div class="chips scroll">${views}<span class="chip">${icon('filters', 'small')} ${copy.documents.filters}</span></div>`;
+}
+
+function sortRow() {
+	return `<div class="toolbar-row"><span class="doc-meta">${copy.documents.count(data.documents.length)}</span>
+		<span class="sort">${icon('sort', 'small')}${copy.documents.sortNewest}</span></div>`;
+}
+
+function snackbar(message, action, offsetFromBottom) {
+	return `<div class="snackbar" style="inset-block-end: ${offsetFromBottom}px"><span class="message">${message}</span><span class="button">${action}</span></div>`;
+}
+
+// Direction A shell: three tabs and a floating Scan button.
+function shellA({ active, top, body, overlay = '', fabRaised = false, fab = true }) {
+	const counts = uploadCounts(false);
+	const tabs = [
+		['inbox', 'inbox', copy.shell.inbox, ''],
+		['documents', 'documents', copy.shell.documents, ''],
+		['uploads', 'upload', copy.shell.uploads, `<span class="count">${counts.unfinished}</span>`],
+	];
+	const nav = tabs.map(([key, iconName, label, badge]) => `
+		<div class="nav-item ${key === active ? 'active' : ''}"><span class="nav-icon">${icon(iconName)}${badge}</span>${label}</div>`).join('');
+	return `${top}
+		<div class="content">${body}</div>
+		${fab ? `<div class="fab" style="inset-block-end: ${fabRaised ? 176 : 100}px">${icon('scan')}${copy.shell.scan}</div>` : ''}
+		${overlay}
+		<nav class="bottom-nav">${nav}</nav>`;
+}
+
+// Direction B shell: one home with Inbox | All, a wide Scan button, and an upload strip.
+function homeB({ segment, hiddenId = null, overlay = '', strip = true }) {
+	const counts = uploadCounts(false);
+	const stripHtml = strip && counts.sending + counts.processing > 0
+		? `<div class="strip">${icon('upload', 'small')}<span class="label">${copy.shell.stripTemplate(counts)}</span>${icon('chevronRight', 'small')}</div>`
+		: '';
+	const segments = `<div class="segmented">
+		<div class="${segment === 'inbox' ? 'selected' : ''}">${copy.shell.inbox} <span class="count">${inboxCount(hiddenId)}</span></div>
+		<div class="${segment === 'all' ? 'selected' : ''}">${copy.shell.all}</div>
+	</div>`;
+	const extras = segment === 'all' ? viewChips() : '';
+	const body = segment === 'all'
+		? sortRow() + allDocumentsList()
+		: `<div class="hint-line" style="padding-block-start: 4px">${copy.inbox.doneHint}</div>` + inboxList(hiddenId);
+	return `<div class="home-head">${searchField()}</div>
+		${stripHtml}
+		<div class="home-head" style="padding-block-start: 12px">${segments}${extras}</div>
+		<div class="content">${body}</div>
+		${overlay}
+		<div class="bottom-action raised"><span class="button primary large block">${icon('scan')}${copy.shell.scan}</span></div>`;
+}
+
+function inboxTopA(hiddenId) {
+	return `<div class="top-bar"><h1 class="start">${copy.shell.inbox}<small>${copy.inbox.newCount(inboxCount(hiddenId))}</small></h1>${avatarButton()}</div>`;
+}
+
+// Screens
+
+const screens = {
+	signIn(direction, optionsOpen = false) {
+		const s = copy.signIn;
+		const options = optionsOpen
+			? `<div class="options-body">
+				<h3>${s.headersTitle}</h3>
+				<span class="help">${s.headersHelp}</span>
+				<div class="header-pair">
+					<div class="field" style="flex: 1; min-inline-size: 0"><span class="field-label">${s.headerName}</span><div class="input"><span class="value">${s.headerExample[0]}</span></div></div>
+					<div class="field" style="flex: 1; min-inline-size: 0"><span class="field-label">${s.headerValue}</span><div class="input"><span class="value">${s.headerExample[1]}</span></div></div>
+				</div>
+				<span class="button outline">${icon('plus', 'small')}${s.addHeader}</span>
+				<h3>${s.certificateTitle} <span class="soon">${s.comingLater}</span></h3>
+				<span class="help">${s.certificateHelp}</span>
+			</div>`
+			: '';
+		return `<div class="content padded">
+			<div class="wordmark">${icon('mark')}${data.appName}</div>
+			<h2 class="screen-heading">${s.heading}</h2>
+			<p class="lead">${s.lead}</p>
+			<div class="stack">
+				<div class="field"><span class="field-label">${s.addressLabel}</span>
+					<div class="input ${optionsOpen ? '' : 'focused'}"><span class="value placeholder">${optionsOpen ? '' : '<span class="caret"></span>'}${s.addressPlaceholder}</span></div>
+					<span class="help">${s.addressHelp}</span></div>
+				<span class="button primary large block">${s.continue}</span>
+			</div>
+			<div class="card options-card">
+				<div class="options-row"><span class="main">${s.optionsTitle}<span class="sub">${s.optionsSummary}</span></span>
+					<span class="icon-button" style="${optionsOpen ? 'transform: rotate(180deg)' : ''}">${icon('chevronDown')}</span></div>
+				${options}
+			</div>
+		</div>`;
+	},
+
+	signInOptions(direction) {
+		return screens.signIn(direction, true);
+	},
+
+	signInStepTwo(direction, codeAsked = false) {
+		const s = copy.signIn;
+		const code = codeAsked
+			? `<div class="notice">${icon('shield', 'small')}<span>${s.codeAsked}</span></div>
+				<div class="field"><span class="field-label">${s.codeLabel}</span>
+					<div class="input focused"><span class="value placeholder"><span class="caret"></span>${s.codePlaceholder}</span></div></div>`
+			: '';
+		return `<div class="top-bar">${iconButton('back', copy.detail.back)}</div>
+		<div class="content padded">
+			<div class="found">${icon('passed')}<span class="main">${s.foundPrefix} <b>${data.server.version}</b> ${s.foundAt} <b>${data.server.address}</b></span><span class="button">${s.change}</span></div>
+			<div class="stack">
+				<div class="field"><span class="field-label">${s.usernameLabel}</span><div class="input ${codeAsked ? '' : 'focused'}"><span class="value">${data.user.username}${codeAsked ? '' : '<span class="caret"></span>'}</span></div></div>
+				<div class="field"><span class="field-label">${s.passwordLabel}</span><div class="input"><span class="value">${codeAsked ? '••••••••••••' : ''}</span>${iconButton('eye', s.showPassword)}</div></div>
+				${code}
+				<span class="button primary large block">${s.signIn}</span>
+				<div class="center"><span class="link">${icon('key', 'small')}&nbsp;${s.useToken}</span></div>
+			</div>
+		</div>`;
+	},
+
+	signInCode(direction) {
+		return screens.signInStepTwo(direction, true);
+	},
+
+	signInFailed() {
+		const s = copy.signIn;
+		const steps = s.steps.map((step) => `
+			<li class="${step.state}">${icon(step.state)}<div class="main">
+				<span class="name">${step.name}</span>
+				<span class="detail">${step.detail}</span>
+				${step.fix ? `<span class="fix">${step.fix}</span><span class="button tonal compact">${s.openOptions}</span>` : ''}
+			</div></li>`).join('');
+		return `<div class="top-bar">${iconButton('back', copy.detail.back)}</div>
+		<div class="content padded">
+			<h2 class="screen-heading">${s.failedHeading}</h2>
+			<p class="lead">${s.failedLead}</p>
+			<ul class="card checklist" style="overflow: hidden">${steps}</ul>
+		</div>
+		<div class="bottom-action">
+			<span class="button primary large block">${s.tryAgain}</span>
+			<span class="button outline block">${icon('copy', 'small')}${s.copyReport}</span>
+		</div>`;
+	},
+
+	inbox(direction, hiddenId = null, overlay = '') {
+		if (direction === 'b') {
+			return homeB({ segment: 'inbox', hiddenId, overlay });
+		}
+		return shellA({
+			active: 'inbox',
+			top: inboxTopA(hiddenId),
+			body: `<div class="hint-line">${copy.inbox.doneHint}</div>` + inboxList(hiddenId),
+			overlay,
+			fabRaised: overlay !== '',
+		});
+	},
+
+	inboxUndo(direction) {
+		const offset = direction === 'a' ? 96 : 88;
+		return screens.inbox(direction, data.doneDocumentId, snackbar(copy.inbox.undoMessage, copy.inbox.undo, offset));
+	},
+
+	documents(direction, overlay = '') {
+		if (direction === 'b') {
+			return homeB({ segment: 'all', overlay });
+		}
+		return shellA({
+			active: 'documents',
+			top: `<div class="home-head">${searchField()}${viewChips()}</div>`,
+			body: sortRow() + allDocumentsList(),
+			overlay,
+		});
+	},
+
+	searchTyping() {
+		const s = copy.search;
+		const typed = data.search.typed;
+		const suggestions = data.search.suggestions.map((word) => `
+			<div class="suggestion">${icon('search')}<span class="main"><b>${typed}</b>${word.slice(typed.length)}</span></div>`).join('');
+		const labels = data.search.labelMatches.map(([kind, name]) => `
+			<div class="suggestion">${icon('person')}<span class="main">${name}<span class="sub">${kind}</span></span></div>`).join('');
+		const recent = data.search.recent.map((word) => `
+			<div class="suggestion">${icon('history')}<span class="main">${word}</span></div>`).join('');
+		const keys = data.system.keyboardRows.map((row) => `<div class="key-row">${[...row].map((letter) => `<span class="key">${letter}</span>`).join('')}</div>`).join('');
+		return `<div class="home-head" style="flex-direction: row; align-items: center; gap: 4px; padding-inline-start: 4px">
+				${iconButton('back', copy.detail.back)}
+				<div class="search-field focused" style="flex: 1"><span class="value">${typed}<span class="caret"></span></span>${iconButton('close', s.clear)}</div>
+			</div>
+			<div class="content">
+				<div class="group-head">${s.suggestions}</div>${suggestions}
+				<div class="group-head">${s.labels}</div>${labels}
+				<div class="group-head">${s.recent}</div>${recent}
+			</div>
+			<div class="keyboard">${keys}
+				<div class="key-row"><span class="key wide">${data.system.keyboardSymbols}</span><span class="key">,</span><span class="key space"></span><span class="key">.</span><span class="key wide action">${icon('search', 'small')}</span></div>
+			</div>`;
+	},
+
+	filters(direction) {
+		const f = copy.filterSheet;
+		const values = data.filters;
+		const matching = data.documents.filter((document) =>
+			values.tags.every((tag) => document.tags.includes(tag)) && document.correspondent === values.correspondent).length;
+		const tagChips = values.tags.map((tag) => `<span class="chip selected">${tag} ${icon('close', 'small')}</span>`).join('');
+		const select = (label, value) => `<div class="field"><span class="field-label">${label}</span>
+			<div class="input"><span class="value ${value ? '' : 'placeholder'}">${value || f.any}</span><span class="icon-button">${icon('chevronDown')}</span></div></div>`;
+		const sheet = `<div class="scrim"></div>
+			<div class="sheet">
+				<div class="sheet-handle"></div>
+				<div class="sheet-head"><h2>${f.title}</h2><span class="button">${f.clearAll}</span></div>
+				<div class="sheet-body">
+					<div class="field"><span class="field-label">${f.tags}</span>
+						<div class="segmented"><div class="${values.tagMode === 'all' ? 'selected' : ''}">${f.hasAll}</div><div class="${values.tagMode === 'any' ? 'selected' : ''}">${f.hasAny}</div></div>
+						<div class="chips" style="margin-block-start: 6px">${tagChips}<span class="chip">${icon('plus', 'small')} ${f.addTag}</span></div>
+					</div>
+					${select(f.correspondent, values.correspondent)}
+					${select(f.documentType, values.documentType)}
+					<div class="field"><span class="field-label">${f.created}</span>
+						<div class="two">
+							<div class="input"><span class="value"><span class="field-label">${f.from}</span><br>${values.createdFrom || f.any}</span></div>
+							<div class="input"><span class="value"><span class="field-label">${f.to}</span><br><span class="placeholder">${values.createdTo || f.any}</span></span></div>
+						</div></div>
+					${select(f.storagePath, values.storagePath)}
+				</div>
+				<div class="sheet-foot"><span class="button outline">${f.saveAsView}</span><span class="button primary">${f.show(matching)}</span></div>
+			</div>`;
+		return screens.documents(direction, sheet);
+	},
+
+	detail(direction, mode = 'view') {
+		const d = copy.detail;
+		const document = documentById(data.detailDocumentId);
+		const rows = [
+			[d.correspondent, document.correspondent],
+			[d.type, document.type],
+			[d.created, formatDate(document.created)],
+			[d.tags, `<span class="doc-tags">${tagList(document.tags)}</span>`],
+			[d.storagePath, document.storagePath],
+			[d.archiveNumber, document.archiveNumber],
+			...document.customFields,
+		].map(([label, value]) => `<div class="detail-row"><span class="label">${label}</span><span class="value">${value}</span></div>`).join('');
+		const notes = document.notes.map((note) => `<div class="card note"><span class="by">${note.author} · ${note.date}</span>${note.text}</div>`).join('');
+		const menu = mode === 'menu'
+			? `<div class="menu" style="inset-block-start: 56px; inset-inline-end: 8px">
+				<div class="menu-item">${icon('download')}${d.download}</div>
+				<div class="menu-item danger">${icon('trash')}${d.delete}</div></div>`
+			: '';
+		return `<div class="top-bar">${iconButton('back', d.back)}<span class="spacer"></span>${iconButton('share', d.share)}${iconButton('openWith', d.openWith)}${iconButton('more', d.more)}</div>
+		<div class="content" ${mode === 'scrolled' ? 'data-scroll="end"' : ''}>
+			<div class="preview">
+				<div class="paper"><h3>${document.title}</h3><p class="meta">${document.correspondent}. ${document.created}.</p><p>${document.body}</p><p class="meta">${d.sampleFooter}</p></div>
+				<span class="open-hint">${icon('openWith', 'small')}${d.previewHint}</span>
+			</div>
+			<div class="doc-heading"><h2>${document.title}</h2><span class="button tonal compact">${icon('pencil', 'small')}${d.edit}</span></div>
+			<div class="section-title">${d.details}</div>
+			${rows}
+			<div class="section-title">${d.notes}</div>
+			${notes}
+			<div class="note-add"><div class="input"><span class="value placeholder">${d.addNote}</span>${iconButton('plus', d.addNote)}</div></div>
+			<div class="card collapsed-row"><span class="main">${d.textFound}</span>${icon('chevronDown')}</div>
+		</div>
+		${menu}`;
+	},
+
+	detailScrolled(direction) {
+		return screens.detail(direction, 'scrolled');
+	},
+
+	detailMenu(direction) {
+		return screens.detail(direction, 'menu');
+	},
+
+	detailEdit() {
+		const d = copy.detail;
+		const document = documentById(data.detailDocumentId);
+		const field = (label, value, { changed = false, select = false } = {}) => `<div class="field">
+			<span class="field-label">${label}${changed ? ` · <span class="changed-mark">${d.changed}</span>` : ''}</span>
+			<div class="input ${changed ? 'focused' : ''}"><span class="value">${value}${changed ? '<span class="caret"></span>' : ''}</span>${select ? `<span class="icon-button">${icon('chevronDown')}</span>` : ''}</div></div>`;
+		const tagChips = document.tags.map((tag) => `<span class="chip">${tag} ${icon('close', 'small')}</span>`).join('');
+		return `<div class="top-bar">${iconButton('close', d.cancel)}<h1>${d.editTitle}</h1><span class="button primary compact">${d.save(1)}</span></div>
+		<div class="content">
+			<div class="edit-body">
+				<div class="notice">${icon('info', 'small')}<span>${d.onlyChanges}</span></div>
+				${field(d.title, d.changedTitle, { changed: true })}
+				${field(d.correspondent, document.correspondent, { select: true })}
+				${field(d.type, document.type, { select: true })}
+				${field(d.created, formatDate(document.created))}
+				<div class="field"><span class="field-label">${d.tags}</span><div class="chips">${tagChips}<span class="chip">${icon('plus', 'small')}</span></div></div>
+				${field(d.storagePath, document.storagePath, { select: true })}
+				${field(d.archiveNumber, document.archiveNumber)}
+				${document.customFields.map(([label, value]) => field(label, value)).join('')}
+			</div>
+		</div>`;
+	},
+
+	scanner() {
+		const s = copy.scan;
+		return `<div class="content"><div class="scanner-box">${icon('scan')}<strong>${s.scannerFrame}</strong><p>${s.scannerNote}</p></div></div>`;
+	},
+
+	batchOne() {
+		const s = copy.scan;
+		const first = data.batch.documents[0];
+		return `<div class="top-bar">${iconButton('close', s.close)}<h1>${s.batchTitle}</h1></div>
+		<div class="content batch-scroll">
+			<div class="card batch-card">
+				<div class="batch-card-head"><b>${s.documentName(1)}</b><span class="doc-meta">${s.pages(first.pages)}</span><span class="button compact">${s.editPages}</span></div>
+				<div class="page-strip">${Array.from({ length: first.pages }, () => paper()).join('')}</div>
+			</div>
+			<div class="batch-actions">
+				<span class="button outline block large">${icon('plus')}${s.addPages}</span>
+				<span class="button outline block large">${icon('scan')}${s.scanNext}</span>
+			</div>
+			<p class="help">${s.batchHint}</p>
+		</div>
+		<div class="bottom-action raised"><span class="button primary large block">${s.review}</span></div>`;
+	},
+
+	batchThree() {
+		const s = copy.scan;
+		const documents = data.batch.documents;
+		const cards = documents.map((document, index) => `
+			<div class="card batch-card">
+				<div class="batch-card-head"><b>${s.documentName(index + 1)}</b><span class="doc-meta">${s.pages(document.pages)}</span><span class="button compact">${s.editPages}</span></div>
+				<div class="page-strip small">${Array.from({ length: document.pages }, () => paper()).join('')}</div>
+			</div>`).join('');
+		return `<div class="top-bar">${iconButton('close', s.close)}<h1>${s.batchTitle}</h1></div>
+		<div class="content batch-scroll">
+			${cards}
+			<div class="batch-actions">
+				<span class="button outline block">${icon('plus')}${s.addPagesTo(documents.length)}</span>
+				<span class="button outline block">${icon('scan')}${s.scanNext}</span>
+			</div>
+		</div>
+		<div class="bottom-action raised"><span class="button primary large block">${s.reviewCount(documents.length)}</span></div>`;
+	},
+
+	pageEditor() {
+		const s = copy.scan;
+		const pageCount = data.batch.documents[0].pages;
+		const menuPage = pageCount;
+		const menu = `<div class="menu page-menu">
+			<div class="menu-item">${icon('camera')}${s.retake}</div>
+			<div class="menu-item">${icon('rotate')}${s.rotate}</div>
+			<div class="menu-item">${icon('move')}${s.moveTo}</div>
+			<div class="menu-item danger">${icon('trash')}${s.delete}</div>
+		</div>`;
+		let grid = '';
+		for (let number = 1; number <= pageCount; number += 1) {
+			grid += `<div class="page-tile"><div class="paper-wrap">${paper()}
+				<span class="grip" aria-label="${s.dragToReorder}">${icon('grip', 'small')}</span>
+				<span class="page-more ${number === menuPage ? 'open' : ''}" aria-label="${s.pageMenu}">${icon('more', 'small')}</span>
+				${number === menuPage ? menu : ''}</div>
+				<span>${s.page(number)}</span></div>`;
+			if (number === pageCount) {
+				break;
+			}
+			grid += number % 2 === 1
+				? `<div class="seam"><span class="split" aria-label="${s.split}">${icon('scissors', 'small')}</span></div>`
+				: `<div class="seam-row"><span class="split-bar">${icon('scissors', 'small')}${s.split}</span></div>`;
+		}
+		return `<div class="top-bar">${iconButton('back', copy.detail.back)}<h1>${s.editorTitle(1)}<small>${s.pages(pageCount)}</small></h1></div>
+		<div class="content">
+			<div class="pages">${grid}</div>
+		</div>
+		<div class="bottom-action raised"><span class="button primary large block">${s.done}</span></div>`;
+	},
+
+	batchDetails(direction) {
+		return direction === 'a' ? batchDetailsShared() : batchDetailsPager();
+	},
+
+	batchDone(direction) {
+		const message = copy.scan.added(data.batch.documents.length);
+		const offset = direction === 'a' ? 96 : 88;
+		return screens.inbox(direction, null, snackbar(message, copy.scan.view, offset));
+	},
+
+	uploads(direction, offline = false) {
+		const u = copy.uploads;
+		const banner = offline ? `<div class="banner warning">${icon('offline')}<span>${u.offline}</span></div>` : '';
+		const groups = data.uploads.map((group) => `
+			<div class="upload-group">
+				<div class="group-head">${group.heading} · ${u.documents(group.items.length)}</div>
+				${group.items.map((item) => uploadRow(item, uploadState(item, offline))).join('')}
+			</div>`).join('');
+		const top = `<div class="top-bar">${direction === 'b' ? iconButton('back', copy.detail.back) : ''}<h1 class="${direction === 'a' ? 'start' : ''}">${u.title}</h1><span class="button compact">${u.clearFinished}</span></div>`;
+		if (direction === 'a') {
+			return shellA({ active: 'uploads', top: top + banner, body: groups, fab: false });
+		}
+		return `${top}${banner}<div class="content">${groups}</div>`;
+	},
+
+	uploadsOffline(direction) {
+		return screens.uploads(direction, true);
+	},
+
+	settings(direction, scrolled = false) {
+		const s = copy.settings;
+		const counts = [data.tags.length, data.correspondents.length, data.documentTypes.length];
+		const labelRows = s.labelRows.map((label, index) => `<div class="list-row"><span class="main">${label}</span><span class="end">${counts[index]}</span>${icon('chevronRight', 'small')}</div>`).join('');
+		const uploadsRow = direction === 'b'
+			? `<div class="list-row">${icon('upload')}<span class="main">${s.uploads}</span>${icon('chevronRight', 'small')}</div>`
+			: '';
+		return `<div class="top-bar">${iconButton('back', copy.detail.back)}<h1>${s.title}</h1></div>
+		<div class="content" ${scrolled ? 'data-scroll="end"' : ''}>
+			<div class="card account"><span class="avatar">${data.user.initial}</span>
+				<span class="main"><b>${data.user.name}</b><span class="sub">${data.server.address}</span><span class="sub">${data.server.version}</span></span>
+				<span class="button outline compact">${icon('signIn', 'small')}${s.signOut}</span></div>
+			<div class="section-title">${s.appearance}</div>
+			<div class="card settings-card theme-pick"><span class="field-label">${s.theme}</span>
+				<div class="segmented" style="margin-block-start: 8px">${s.themes.map((theme, index) => `<div class="${index === 0 ? 'selected' : ''}">${theme}</div>`).join('')}</div></div>
+			<div class="section-title">${s.labels}</div>
+			<div class="card settings-card">${labelRows}</div>
+			<div class="section-title">${s.other}</div>
+			<div class="card settings-card">
+				${uploadsRow}
+				<div class="list-row">${icon('shield')}<span class="main">${s.privacy}</span>${icon('chevronRight', 'small')}</div>
+				<div class="list-row">${icon('bug')}<span class="main">${s.crashReport}</span>${icon('chevronRight', 'small')}</div>
+				<div class="list-row">${icon('info')}<span class="main">${s.about}</span></div>
+				<div class="about">${s.aboutText}</div>
+			</div>
+			<div style="block-size: 24px"></div>
+		</div>`;
+	},
+
+	settingsScrolled(direction) {
+		return screens.settings(direction, true);
+	},
+};
+
+function uploadRow(item, state) {
+	const u = copy.uploads;
+	const stateClass = { waiting: 'muted', sending: 'accent', processing: 'muted', done: 'success', failed: 'danger', signin: 'danger' }[state];
+	const stateIcon = { waiting: 'offline', sending: 'upload', processing: 'server', done: 'passed', failed: 'alert', signin: 'signIn' }[state];
+	const action = { done: u.open, failed: u.retry, signin: u.signIn }[state];
+	const progress = state === 'sending'
+		? `<div class="progress-line"><div class="progress"><div style="inline-size: ${item.progress}%"></div></div><span>${item.progress}%</span></div>`
+		: '';
+	const reason = state === 'failed' ? `<span class="reason">${u.reasons[item.reason]}</span>` : '';
+	return `<div class="upload-row">${paper('thumb')}
+		<div class="main"><span class="doc-title">${item.title}</span>
+			<span class="state ${stateClass}">${icon(stateIcon, 'small')}${u.states[state]}</span>${progress}${reason}</div>
+		${action ? `<span class="button ${state === 'done' ? 'outline' : 'tonal'} compact">${action}</span>` : ''}
+	</div>`;
+}
+
+function batchFieldValue(own, shared) {
+	const s = copy.scan;
+	if (own) {
+		return `<span>${own}</span><span class="own">${s.onlyThis}</span>`;
+	}
+	return `<span class="inherited">${shared || s.serverChooses}</span><span class="from-batch">${s.fromBatch}</span>`;
+}
+
+function batchDetailsShared() {
+	const s = copy.scan;
+	const batch = data.batch;
+	const sharedRow = (label, value) => `<div class="field-row"><span class="label">${label}</span><span class="value ${value ? '' : 'inherited'}">${value || s.serverChooses}</span>${icon('chevronRight', 'small')}</div>`;
+	const cards = batch.documents.map((document, index) => `
+		<div class="card doc-card">
+			<div class="doc-card-head">${paper()}<b>${s.documentName(index + 1)}</b><span class="doc-meta">${s.pages(document.pages)}</span></div>
+			<div class="title-input"><div class="field"><span class="field-label">${s.title}</span><div class="input"><span class="value">${document.title}</span></div></div></div>
+			<div class="field-row"><span class="label">${s.correspondent}</span><span class="value">${batchFieldValue(document.correspondent, batch.shared.correspondent)}</span></div>
+			<div class="field-row"><span class="label">${s.documentType}</span><span class="value">${batchFieldValue(document.documentType, batch.shared.documentType)}</span></div>
+			<div class="field-row"><span class="label">${s.tags}</span><span class="value">${batchFieldValue(null, batch.shared.tags.join(', '))}</span></div>
+			<div class="field-row"><span class="label">${s.storagePath}</span><span class="value">${batchFieldValue(null, batch.shared.storagePath)}</span></div>
+		</div>`).join('');
+	return `<div class="top-bar">${iconButton('back', copy.detail.back)}<h1>${s.detailsTitle}<small>${copy.uploads.documents(batch.documents.length)}</small></h1></div>
+	<div class="content" style="padding-inline: 16px">
+		<div class="section-title" style="padding-inline: 4px">${s.forEvery}</div>
+		<div class="card shared-card">
+			<div class="field-row" style="border: 0"><span class="label">${s.tags}</span><span class="value"><span class="doc-tags">${tagList(batch.shared.tags)}</span></span>${icon('chevronRight', 'small')}</div>
+			${sharedRow(s.correspondent, batch.shared.correspondent)}
+			${sharedRow(s.documentType, batch.shared.documentType)}
+			${sharedRow(s.storagePath, batch.shared.storagePath)}
+		</div>
+		<p class="help" style="margin-inline: 4px">${s.letServer}</p>
+		${cards}
+	</div>
+	<div class="bottom-action raised"><span class="button primary large block">${s.upload(batch.documents.length)}</span></div>`;
+}
+
+function batchDetailsPager() {
+	const s = copy.scan;
+	const batch = data.batch;
+	const index = batch.pagerIndex;
+	const document = batch.documents[index];
+	const dots = batch.documents.map((_, dotIndex) => `<i class="${dotIndex === index ? 'current' : ''}"></i>`).join('');
+	const block = (label, value, useForAll) => `<div class="field"><span class="field-label">${label}</span>
+		<div class="input"><span class="value ${value ? '' : 'placeholder'}">${value || s.serverChooses}</span><span class="icon-button">${icon('chevronDown')}</span></div>
+		<div class="use-all"><span>${s.useForAll}</span><span class="switch ${useForAll ? 'on' : ''}"></span></div></div>`;
+	return `<div class="top-bar">${iconButton('back', copy.detail.back)}<h1>${s.detailsTitle}</h1></div>
+	<div class="pager-head"><b>${s.documentName(index + 1)} · ${s.ofCount(index + 1, batch.documents.length)}</b><span class="dots">${dots}</span></div>
+	<div class="content">
+		<div class="page-strip" style="padding-inline: 20px">${Array.from({ length: document.pages }, () => paper()).join('')}<span class="doc-meta" style="align-self: flex-end">${s.pages(document.pages)}</span></div>
+		<div class="pager-fields">
+			<div class="field"><span class="field-label">${s.title}</span><div class="input focused"><span class="value">${document.title}<span class="caret"></span></span></div></div>
+			<div class="field"><span class="field-label">${s.tags}</span><div class="chips">${batch.shared.tags.map((tag) => `<span class="chip selected">${tag} ${icon('close', 'small')}</span>`).join('')}<span class="chip">${icon('plus', 'small')}</span></div>
+				<div class="use-all"><span>${s.useForAll}</span><span class="switch on"></span></div></div>
+			${block(s.correspondent, document.correspondent, false)}
+			${block(s.documentType, document.documentType, false)}
+			${block(s.storagePath, batch.shared.storagePath, true)}
+		</div>
+	</div>
+	<div class="bottom-action raised"><div class="two"><span class="button outline large">${s.previous}</span><span class="button primary large">${s.next}</span></div></div>`;
+}
+
+const PHONE_CLASS = { scanner: 'scanner-screen' };
+
+window.renderBoard = function (root, direction) {
+	const board = copy.board;
+	const rows = board.rows.map((row) => `
+		<section class="board-row"><h2>${row.heading}</h2><div class="frames">
+			${row.frames.map((frame) => {
+				const note = typeof frame.note === 'object' ? frame.note[direction] : frame.note;
+				return `<div class="frame"><div class="frame-label"><b>${frame.label}</b>${note ? `<span>${note}</span>` : ''}</div>
+					${phone(screens[frame.id](direction), PHONE_CLASS[frame.id] || '')}</div>`;
+			}).join('')}
+		</div></section>`).join('');
+	const forks = board.forks.map((fork, forkIndex) => `
+		<div class="fork"><h3>${fork.heading}</h3><div class="fork-options">
+			${fork.options.map((option, optionIndex) => `
+				<div class="fork-option ${['a', 'b'][optionIndex] === direction ? 'current' : ''}"><h4>${option.name}</h4>
+					<p><b>${board.goodAt}.</b> ${option.good}</p><p><b>${board.costs}.</b> ${option.cost}</p></div>`).join('')}
+		</div></div>`).join('');
+	root.innerHTML = `<header class="board-head"><h1>${board.title}</h1><p><span class="direction">${board.directionNames[direction]}.</span> ${board.directionSummaries[direction]}</p><p>${board.subtitle}</p></header>
+		${rows}
+		<section class="forks"><h2>${board.forksHeading}</h2>${forks}</section>`;
+	for (const scroller of root.querySelectorAll('[data-scroll="end"]')) {
+		scroller.scrollTop = scroller.scrollHeight;
+	}
+};
+</script>
+<script src="shared/switcher.js"></script>
+</body>
+</html>
