@@ -24,7 +24,8 @@ export type FailureReason =
 
 export type UploadState =
   | { kind: 'preparing' }
-  | { kind: 'waiting'; attempt: number; notBefore: number; maybeSent: boolean }
+  | { kind: 'waiting'; attempt: number; notBefore: number; maybeSent: false }
+  | { kind: 'waiting'; attempt: number; notBefore: number; maybeSent: true; startedAt: number }
   | { kind: 'sending'; attempt: number; startedAt: number }
   | { kind: 'processing'; taskId: TaskId; checks: number; nextCheckAt: number }
   | { kind: 'done'; documentId: DocumentId }
@@ -71,8 +72,17 @@ export class InvalidTransition extends Error {
   }
 }
 
+type StateKind = UploadState['kind'];
+type EventKind = UploadEvent['kind'];
+type StateOf<Kind extends StateKind> = Extract<UploadState, { kind: Kind }>;
+type EventOf<Kind extends EventKind> = Extract<UploadEvent, { kind: Kind }>;
+
 const second = 1000;
 const minute = 60 * second;
+
+// After a send that got no reply, the server may still be working on the request for this long.
+export const sentGraceWindow = 2 * minute;
+const graceRecheckDelay = 30 * second;
 
 export function sendRetryDelay(attempt: number): number {
   return Math.min(30 * minute, 5 * second * 2 ** attempt);
@@ -86,23 +96,24 @@ export function uploadFilename(id: JobId): string {
   return `${id}.pdf`;
 }
 
-function waitingFromStart(now: number): UploadState {
-  return { kind: 'waiting', attempt: 0, notBefore: now, maybeSent: false };
+function waitToSend(attempt: number, notBefore: number): UploadState {
+  return { kind: 'waiting', attempt, notBefore, maybeSent: false };
 }
 
-function retryLater(attempt: number, now: number, maybeSent: boolean): UploadState {
-  return { kind: 'waiting', attempt: attempt + 1, notBefore: now + sendRetryDelay(attempt), maybeSent };
+function waitToReconcile(attempt: number, notBefore: number, startedAt: number): UploadState {
+  return { kind: 'waiting', attempt, notBefore, maybeSent: true, startedAt };
 }
 
-function afterSendFailure(attempt: number, error: PaperlessError, now: number): UploadState {
+function afterSendFailure(state: StateOf<'sending'>, error: PaperlessError, now: number): UploadState {
+  const retryAt = now + sendRetryDelay(state.attempt);
   switch (error.kind) {
     case 'network':
     case 'timeout':
     case 'server':
     case 'invalid_response':
-      return retryLater(attempt, now, true);
+      return waitToReconcile(state.attempt + 1, retryAt, state.startedAt);
     case 'rate_limited':
-      return retryLater(attempt, now, false);
+      return waitToSend(state.attempt + 1, retryAt);
     case 'unauthorized':
     case 'forbidden':
       return { kind: 'failed', reason: { kind: 'sign_in_required' } };
@@ -113,15 +124,10 @@ function afterSendFailure(attempt: number, error: PaperlessError, now: number): 
   }
 }
 
-function nextCheck(state: Extract<UploadState, { kind: 'processing' }>, now: number): UploadState {
+function nextCheck(state: StateOf<'processing'>, now: number): UploadState {
   const checks = state.checks + 1;
   return { ...state, checks, nextCheckAt: now + pollDelay(checks) };
 }
-
-type StateKind = UploadState['kind'];
-type EventKind = UploadEvent['kind'];
-type StateOf<Kind extends StateKind> = Extract<UploadState, { kind: Kind }>;
-type EventOf<Kind extends EventKind> = Extract<UploadEvent, { kind: Kind }>;
 
 type Handler<State extends StateKind, Event extends EventKind> = (
   state: StateOf<State>,
@@ -135,7 +141,7 @@ type TransitionTable = {
 
 const transitions: TransitionTable = {
   preparing: {
-    prepared: (_state, _event, now) => waitingFromStart(now),
+    prepared: (_state, _event, now) => waitToSend(0, now),
     prepareFailed: (_state, event) => ({
       kind: 'failed',
       reason: { kind: 'pdf_failed', message: event.message },
@@ -152,9 +158,19 @@ const transitions: TransitionTable = {
       state.maybeSent ? { kind: 'done', documentId: event.documentId } : 'refused',
     foundTask: (state, event, now) =>
       state.maybeSent ? { kind: 'processing', taskId: event.taskId, checks: 0, nextCheckAt: now } : 'refused',
-    notFound: (state) => (state.maybeSent ? { ...state, maybeSent: false } : 'refused'),
+    notFound: (state, _event, now) => {
+      if (!state.maybeSent) {
+        return 'refused';
+      }
+      if (now - state.startedAt < sentGraceWindow) {
+        return { ...state, notBefore: now + graceRecheckDelay };
+      }
+      return waitToSend(state.attempt, now);
+    },
     reconcileFailed: (state, _event, now) =>
-      state.maybeSent ? retryLater(state.attempt, now, true) : 'refused',
+      state.maybeSent
+        ? waitToReconcile(state.attempt + 1, now + sendRetryDelay(state.attempt), state.startedAt)
+        : 'refused',
   },
   sending: {
     sendAccepted: (_state, event, now) => ({
@@ -163,13 +179,8 @@ const transitions: TransitionTable = {
       checks: 0,
       nextCheckAt: now + pollDelay(0),
     }),
-    sendFailed: (state, event, now) => afterSendFailure(state.attempt, event.error, now),
-    interrupted: (state, _event, now) => ({
-      kind: 'waiting',
-      attempt: state.attempt,
-      notBefore: now,
-      maybeSent: true,
-    }),
+    sendFailed: (state, event, now) => afterSendFailure(state, event.error, now),
+    interrupted: (state, _event, now) => waitToReconcile(state.attempt + 1, now, state.startedAt),
   },
   processing: {
     taskPending: (state, _event, now) => nextCheck(state, now),
@@ -183,10 +194,10 @@ const transitions: TransitionTable = {
   done: {},
   failed: {
     signedIn: (state, _event, now) =>
-      state.reason.kind === 'sign_in_required' ? waitingFromStart(now) : 'refused',
+      state.reason.kind === 'sign_in_required' ? waitToSend(0, now) : 'refused',
     retryRequested: (state, _event, now) =>
       state.reason.kind === 'rejected' || state.reason.kind === 'consumption_failed'
-        ? waitingFromStart(now)
+        ? waitToSend(0, now)
         : 'refused',
   },
 };

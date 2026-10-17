@@ -12,23 +12,29 @@ import {
   nextStep,
   pollDelay,
   sendRetryDelay,
+  sentGraceWindow,
   transition,
   type UploadEvent,
   type UploadJob,
   type UploadState,
 } from './machine';
 
-const now = 5000;
+const now = 1_000_000;
+const earlier = now - 4000;
+const later = now + 4000;
+const startedAt = now - 1000;
+const startedLongAgo = now - sentGraceWindow;
 const taskId = 'task-1' as TaskId;
 const documentId = 42 as DocumentId;
 
 const states = {
   preparing: { kind: 'preparing' },
-  waitingReady: { kind: 'waiting', attempt: 2, notBefore: 1000, maybeSent: false },
-  waitingEarly: { kind: 'waiting', attempt: 2, notBefore: 9000, maybeSent: false },
-  waitingMaybeSent: { kind: 'waiting', attempt: 2, notBefore: 1000, maybeSent: true },
-  sending: { kind: 'sending', attempt: 2, startedAt: 4000 },
-  processing: { kind: 'processing', taskId, checks: 3, nextCheckAt: 4000 },
+  waitingReady: { kind: 'waiting', attempt: 2, notBefore: earlier, maybeSent: false },
+  waitingEarly: { kind: 'waiting', attempt: 2, notBefore: later, maybeSent: false },
+  waitingMaybeSent: { kind: 'waiting', attempt: 2, notBefore: earlier, maybeSent: true, startedAt },
+  waitingMaybeSentLongAgo: { kind: 'waiting', attempt: 2, notBefore: earlier, maybeSent: true, startedAt: startedLongAgo },
+  sending: { kind: 'sending', attempt: 2, startedAt },
+  processing: { kind: 'processing', taskId, checks: 3, nextCheckAt: earlier },
   done: { kind: 'done', documentId },
   failedSignIn: { kind: 'failed', reason: { kind: 'sign_in_required' } },
   failedRejected: { kind: 'failed', reason: { kind: 'rejected', status: 413, message: 'too big' } },
@@ -65,6 +71,7 @@ const accepted: Record<StateName, EventName[]> = {
   waitingReady: ['sendStarted', 'fileMissing'],
   waitingEarly: ['fileMissing'],
   waitingMaybeSent: ['foundDocument', 'foundTask', 'notFound', 'reconcileFailed'],
+  waitingMaybeSentLongAgo: ['foundDocument', 'foundTask', 'notFound', 'reconcileFailed'],
   sending: ['sendAccepted', 'sendFailed', 'interrupted'],
   processing: ['taskPending', 'checkFailed', 'taskSucceeded', 'taskFailed'],
   done: [],
@@ -85,11 +92,12 @@ describe('transitions the table accepts', () => {
     ['waitingReady', events.fileMissing, { kind: 'failed', reason: { kind: 'file_missing' } }],
     ['waitingEarly', events.fileMissing, { kind: 'failed', reason: { kind: 'file_missing' } }],
     ['sending', events.sendAccepted, { kind: 'processing', taskId, checks: 0, nextCheckAt: now + 2000 }],
-    ['sending', events.interrupted, { kind: 'waiting', attempt: 2, notBefore: now, maybeSent: true }],
+    ['sending', events.interrupted, { kind: 'waiting', attempt: 3, notBefore: now, maybeSent: true, startedAt }],
     ['waitingMaybeSent', events.foundDocument, { kind: 'done', documentId }],
     ['waitingMaybeSent', events.foundTask, { kind: 'processing', taskId, checks: 0, nextCheckAt: now }],
-    ['waitingMaybeSent', events.notFound, { kind: 'waiting', attempt: 2, notBefore: 1000, maybeSent: false }],
-    ['waitingMaybeSent', events.reconcileFailed, { kind: 'waiting', attempt: 3, notBefore: now + 20_000, maybeSent: true }],
+    ['waitingMaybeSent', events.notFound, { kind: 'waiting', attempt: 2, notBefore: now + 30_000, maybeSent: true, startedAt }],
+    ['waitingMaybeSentLongAgo', events.notFound, { kind: 'waiting', attempt: 2, notBefore: now, maybeSent: false }],
+    ['waitingMaybeSent', events.reconcileFailed, { kind: 'waiting', attempt: 3, notBefore: now + 20_000, maybeSent: true, startedAt }],
     ['processing', events.taskPending, { kind: 'processing', taskId, checks: 4, nextCheckAt: now + 32_000 }],
     ['processing', events.checkFailed, { kind: 'processing', taskId, checks: 4, nextCheckAt: now + 32_000 }],
     ['processing', events.taskSucceeded, { kind: 'done', documentId }],
@@ -103,7 +111,7 @@ describe('transitions the table accepts', () => {
 });
 
 describe('a failed send', () => {
-  const retryMaybeSent: UploadState = { kind: 'waiting', attempt: 3, notBefore: now + 20_000, maybeSent: true };
+  const retryMaybeSent: UploadState = { kind: 'waiting', attempt: 3, notBefore: now + 20_000, maybeSent: true, startedAt };
 
   test.each<[PaperlessError, UploadState]>([
     [{ kind: 'network', message: 'offline' }, retryMaybeSent],
@@ -185,10 +193,10 @@ function jobIn(state: UploadState): UploadJob {
 describe('nextStep', () => {
   test.each<[StateName, ReturnType<typeof nextStep>]>([
     ['preparing', { effect: 'prepare', at: 100 }],
-    ['waitingEarly', { effect: 'send', at: 9000 }],
-    ['waitingMaybeSent', { effect: 'reconcile', at: 1000 }],
+    ['waitingEarly', { effect: 'send', at: later }],
+    ['waitingMaybeSent', { effect: 'reconcile', at: earlier }],
     ['sending', { effect: 'none' }],
-    ['processing', { effect: 'check', taskId, at: 4000 }],
+    ['processing', { effect: 'check', taskId, at: earlier }],
     ['done', { effect: 'none' }],
     ['failedRejected', { effect: 'none' }],
   ])('%s', (stateName, expected) => {

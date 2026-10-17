@@ -146,6 +146,33 @@ describe('runStep against a real server', () => {
     expect(await documentsNamed(uploadFilename(job.id))).toBe(1);
   });
 
+  test('a send the server finishes after the app died is found, not sent again', async () => {
+    const before = await documentCount();
+    const store = new MemoryJobStore();
+    const lateServer: UploadClient<Blob> = {
+      ...client,
+      postDocument: async (fields, file, filename) => {
+        setTimeout(() => void client.postDocument(fields, file, filename), 5000);
+        throw new Error('the app was killed while the body was still in flight');
+      },
+    };
+
+    const job = queueJob(uniqueName('late task'));
+    const prepared = await runStep(job, depsFor(client, store));
+    await expect(runStep(prepared, depsFor(lateServer, store))).rejects.toThrow('killed');
+
+    const [saved] = await store.loadAll();
+    const recovered = recoverAfterRestart(saved, Date.now());
+    const lookedOnce = await runStep(recovered, depsFor(client, store));
+    expect(lookedOnce.state).toMatchObject({ kind: 'waiting', maybeSent: true });
+
+    const finished = await runUntilSettled(lookedOnce, depsFor(client, store));
+
+    expect(finished.state.kind).toBe('done');
+    expect(await documentCount()).toBe(before + 1);
+    expect(await documentsNamed(uploadFilename(job.id))).toBe(1);
+  });
+
   test('a file Paperless cannot read ends as consumption_failed', async () => {
     const before = await documentCount();
     const job = queueJob(uniqueName('corrupt'));
