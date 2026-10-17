@@ -7,7 +7,7 @@ Waraq needs Paperless-ngx 3.0 or newer. It talks to the REST API at version 10.
 ## Code layout
 
 - `src/paperless/` is the API client. It uses the `fetch` it is given, and parses every response with Zod before the rest of the app sees it. Zod is the one dependency added for that.
-- `src/upload/` holds the upload job. Each scanned document becomes one job, and a table in `machine.ts` lists every state change the job allows.
+- `src/upload/` holds the upload job. Each scanned document becomes one job, and a table in `machine.ts` lists every state change the job allows. `runStep` in `runner.ts` is the only code in that folder that talks to the server or the disk.
 - `src/brand.json` holds the app name, slug, and Android package. Change them there.
 
 ## How an upload moves

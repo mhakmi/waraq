@@ -1,0 +1,174 @@
+import { randomBytes } from 'node:crypto';
+import { existsSync, mkdtempSync, openAsBlob, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+
+import { afterAll, describe, expect, test } from 'vitest';
+
+import type { UploadFields } from '../src/paperless/client';
+import { success } from '../src/paperless/errors';
+import {
+  AccountId,
+  BatchId,
+  JobId,
+  newUploadJob,
+  nextStep,
+  transition,
+  type UploadJob,
+  uploadFilename,
+} from '../src/upload/machine';
+import {
+  MemoryJobStore,
+  recoverAfterRestart,
+  type RunnerDeps,
+  runStep,
+  type UploadClient,
+} from '../src/upload/runner';
+import { uuidV7 } from '../src/upload/uuid';
+import { client, clientWithToken, documentCount, serverUrl, token, uniqueName } from './helpers';
+import { corruptPdf, syntheticPdf } from './synthetic-pdf';
+
+const folder = mkdtempSync(join(tmpdir(), 'waraq-upload-'));
+
+afterAll(() => {
+  rmSync(folder, { recursive: true, force: true });
+});
+
+function fieldsTitled(title: string): UploadFields {
+  return {
+    title,
+    created: null,
+    correspondentId: null,
+    documentTypeId: null,
+    storagePathId: null,
+    tagIds: [],
+    archiveSerialNumber: null,
+    customFields: [],
+  };
+}
+
+function queueJob(title: string): UploadJob {
+  const now = Date.now();
+  return newUploadJob({
+    id: JobId.parse(uuidV7(now, randomBytes(10))),
+    accountId: AccountId.parse('test-account'),
+    batchId: BatchId.parse(uuidV7(now, randomBytes(10))),
+    fields: fieldsTitled(title),
+    pageCount: 1,
+    now,
+  });
+}
+
+function depsFor(
+  uploadClient: UploadClient<Blob>,
+  store: MemoryJobStore,
+  pdf: (title: string) => Blob = syntheticPdf,
+): RunnerDeps<Blob> {
+  return {
+    client: uploadClient,
+    store,
+    now: Date.now,
+    readFile: async (path) => (existsSync(path) ? openAsBlob(path, { type: 'application/pdf' }) : null),
+    buildPdf: async (job) => {
+      const path = join(folder, uploadFilename(job.id));
+      writeFileSync(path, Buffer.from(await pdf(job.fields.title).arrayBuffer()));
+      return success(path);
+    },
+  };
+}
+
+async function runUntilSettled(job: UploadJob, deps: RunnerDeps<Blob>): Promise<UploadJob> {
+  let current = job;
+  for (;;) {
+    const step = nextStep(current);
+    if (step.effect === 'none') {
+      return current;
+    }
+    const wait = step.at - Date.now();
+    if (wait > 0) {
+      await new Promise((resolve) => setTimeout(resolve, wait));
+    }
+    current = await runStep(current, deps);
+  }
+}
+
+async function documentsNamed(filename: string): Promise<number> {
+  const response = await fetch(
+    `${serverUrl}/api/documents/?original_filename__iexact=${encodeURIComponent(filename)}&fields=id`,
+    { headers: { Authorization: `Token ${token}` } },
+  );
+  const body = (await response.json()) as { count: number };
+  return body.count;
+}
+
+describe('runStep against a real server', () => {
+  test('a queued document ends as done with the id of a real document', async () => {
+    const before = await documentCount();
+    const title = uniqueName('happy path');
+    const job = queueJob(title);
+
+    const finished = await runUntilSettled(job, depsFor(client, new MemoryJobStore()));
+
+    expect(finished.state.kind).toBe('done');
+    if (finished.state.kind !== 'done') {
+      return;
+    }
+    const document = await client.getDocument(finished.state.documentId);
+    expect(document.ok && document.value.title).toBe(title);
+    expect(document.ok && document.value.originalFileName).toBe(uploadFilename(job.id));
+    expect(await documentCount()).toBe(before + 1);
+  });
+
+  test('after a crash mid-send the job finds its upload instead of sending it again', async () => {
+    const before = await documentCount();
+    const store = new MemoryJobStore();
+    const crashingClient: UploadClient<Blob> = {
+      ...client,
+      postDocument: async (fields, file, filename) => {
+        await client.postDocument(fields, file, filename);
+        throw new Error('the app was killed before it saved the task id');
+      },
+    };
+
+    const job = queueJob(uniqueName('crash path'));
+    const prepared = await runStep(job, depsFor(client, store));
+    await expect(runStep(prepared, depsFor(crashingClient, store))).rejects.toThrow('killed');
+
+    const [saved] = await store.loadAll();
+    expect(saved.state.kind).toBe('sending');
+    const recovered = recoverAfterRestart(saved, Date.now());
+    expect(recovered.state).toMatchObject({ kind: 'waiting', maybeSent: true });
+
+    const finished = await runUntilSettled(recovered, depsFor(client, store));
+
+    expect(finished.state.kind).toBe('done');
+    expect(await documentCount()).toBe(before + 1);
+    expect(await documentsNamed(uploadFilename(job.id))).toBe(1);
+  });
+
+  test('a file Paperless cannot read ends as consumption_failed', async () => {
+    const before = await documentCount();
+    const job = queueJob(uniqueName('corrupt'));
+
+    const finished = await runUntilSettled(job, depsFor(client, new MemoryJobStore(), corruptPdf));
+
+    expect(finished.state).toMatchObject({ kind: 'failed', reason: { kind: 'consumption_failed' } });
+    expect(await documentCount()).toBe(before);
+  });
+
+  test('a bad token ends as sign_in_required and sends nothing', async () => {
+    const before = await documentCount();
+    const store = new MemoryJobStore();
+    const job = queueJob(uniqueName('bad token'));
+
+    const finished = await runUntilSettled(job, depsFor(clientWithToken('not-a-real-token'), store));
+
+    expect(finished.state).toEqual({ kind: 'failed', reason: { kind: 'sign_in_required' } });
+    expect(await documentCount()).toBe(before);
+
+    const signedIn = { ...finished, state: transition(finished.state, { kind: 'signedIn' }, Date.now()) };
+    const retried = await runUntilSettled(signedIn, depsFor(client, store));
+    expect(retried.state.kind).toBe('done');
+    expect(await documentCount()).toBe(before + 1);
+  });
+});
