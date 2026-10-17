@@ -14,7 +14,7 @@ import {
 
 export interface JobStore {
   loadAll(): Promise<UploadJob[]>;
-  insert(job: UploadJob): Promise<void>;
+  insert(job: UploadJob): Promise<boolean>;
   saveIfUnchanged(job: UploadJob, loadedUpdatedAt: number): Promise<boolean>;
   deleteIfUnchanged(id: JobId, loadedUpdatedAt: number): Promise<boolean>;
 }
@@ -26,8 +26,12 @@ export class MemoryJobStore implements JobStore {
     return Array.from(this.jobs.values(), (job) => structuredClone(job));
   }
 
-  async insert(job: UploadJob): Promise<void> {
+  async insert(job: UploadJob): Promise<boolean> {
+    if (this.jobs.has(job.id)) {
+      return false;
+    }
     this.jobs.set(job.id, structuredClone(job));
+    return true;
   }
 
   async saveIfUnchanged(job: UploadJob, loadedUpdatedAt: number): Promise<boolean> {
@@ -54,15 +58,17 @@ export type UploadClient<File> = Pick<
 
 const day = 24 * 60 * 60 * 1000;
 
+export type PdfBuildFailure = { kind: 'file_missing' } | { kind: 'pdf_failed'; message: string };
+
 export type RunnerDeps<File> = {
   client: UploadClient<File>;
   store: JobStore;
   now: () => number;
   readFile: (path: string) => Promise<File | null>;
-  buildPdf: (job: UploadJob) => Promise<Result<string, string>>;
+  buildPdf: (job: UploadJob) => Promise<Result<string, PdfBuildFailure>>;
 };
 
-function advance(job: UploadJob, event: UploadEvent, now: number): UploadJob {
+export function advance(job: UploadJob, event: UploadEvent, now: number): UploadJob {
   // The store compares updatedAt to spot a stale writer, so each write must change it even within one millisecond.
   return { ...job, state: transition(job.state, event, now), updatedAt: Math.max(now, job.updatedAt + 1) };
 }
@@ -72,9 +78,16 @@ async function saveOrKeep(store: JobStore, loaded: UploadJob, next: UploadJob): 
 }
 
 async function prepare<File>(job: UploadJob, deps: RunnerDeps<File>, now: number): Promise<UploadJob> {
+  if (job.input.kind === 'pdf') {
+    return advance({ ...job, pdfPath: job.input.uri }, { kind: 'prepared' }, now);
+  }
   const built = await deps.buildPdf(job);
   if (!built.ok) {
-    return advance(job, { kind: 'prepareFailed', message: built.error }, now);
+    const event: UploadEvent =
+      built.error.kind === 'file_missing'
+        ? { kind: 'fileMissing' }
+        : { kind: 'prepareFailed', message: built.error.message };
+    return advance(job, event, now);
   }
   return advance({ ...job, pdfPath: built.value }, { kind: 'prepared' }, now);
 }

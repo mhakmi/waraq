@@ -11,7 +11,15 @@ import {
   type UploadJob,
   type UploadState,
 } from './machine';
-import { deleteJob, MemoryJobStore, recoverAfterRestart, type RunnerDeps, runStep, type UploadClient } from './runner';
+import {
+  deleteJob,
+  MemoryJobStore,
+  type PdfBuildFailure,
+  recoverAfterRestart,
+  type RunnerDeps,
+  runStep,
+  type UploadClient,
+} from './runner';
 
 const unreachable = async () => {
   throw new Error('the server must not be called');
@@ -29,6 +37,7 @@ function jobIn(state: UploadState, pdfPath: string | null): UploadJob {
     id: JobId.parse('0190a000-0000-7000-8000-000000000001'),
     accountId: AccountId.parse('account'),
     batchId: BatchId.parse('0190a000-0000-7000-8000-000000000002'),
+    input: { kind: 'pages', pages: [{ uri: 'file:///page-1.jpg', rotation: 0 }] },
     pageCount: 1,
     now: 0,
     fields: {
@@ -155,7 +164,43 @@ describe('check', () => {
   });
 });
 
+describe('prepare', () => {
+  test('a document that arrives as a PDF skips the build and is sent as it is', async () => {
+    const job: UploadJob = { ...jobIn({ kind: 'preparing' }, null), input: { kind: 'pdf', uri: 'file:///shared.pdf' } };
+    const store = await storing(job);
+
+    const next = await runStep(job, depsAt(now, store));
+
+    expect(next.pdfPath).toBe('file:///shared.pdf');
+    expect(next.state).toEqual({ kind: 'waiting', attempt: 0, notBefore: now, maybeSent: false });
+    expect(await store.loadAll()).toEqual([next]);
+  });
+
+  test.each<[PdfBuildFailure, UploadState]>([
+    [{ kind: 'file_missing' }, { kind: 'failed', reason: { kind: 'file_missing' } }],
+    [{ kind: 'pdf_failed', message: 'out of space' }, { kind: 'failed', reason: { kind: 'pdf_failed', message: 'out of space' } }],
+  ])('a build that fails with %o leaves the job %o', async (buildFailure, expected) => {
+    const job = jobIn({ kind: 'preparing' }, null);
+    const store = await storing(job);
+    const deps = { ...depsAt(now, store), buildPdf: async () => failure(buildFailure) };
+
+    const next = await runStep(job, deps);
+
+    expect(next.state).toEqual(expected);
+    expect(await store.loadAll()).toEqual([next]);
+  });
+});
+
 describe('MemoryJobStore', () => {
+  test('refuses to insert a job whose id is already stored and keeps the stored one', async () => {
+    const job = jobIn({ kind: 'sending', attempt: 0, startedAt: 0 }, '/file.pdf');
+    const store = new MemoryJobStore();
+
+    expect(await store.insert(job)).toBe(true);
+    expect(await store.insert({ ...job, state: { kind: 'preparing' } })).toBe(false);
+    expect(await store.loadAll()).toEqual([job]);
+  });
+
   test('refuses a write from a copy that is no longer the stored one', async () => {
     const job = jobIn({ kind: 'preparing' }, null);
     const store = await storing(job);

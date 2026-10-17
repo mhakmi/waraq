@@ -3,6 +3,7 @@ import { describe, expect, test } from 'vitest';
 import type { PaperlessError } from '../paperless/errors';
 import type { DocumentId, TaskId } from '../paperless/schemas';
 import {
+  accepts,
   AccountId,
   BatchId,
   canDelete,
@@ -56,6 +57,7 @@ const states = {
   failedConsumption: { kind: 'failed', reason: { kind: 'consumption_failed', message: 'bad pdf' } },
   failedFileMissing: { kind: 'failed', reason: { kind: 'file_missing' } },
   failedPdf: { kind: 'failed', reason: { kind: 'pdf_failed', message: 'no pages' } },
+  failedUnreadable: { kind: 'failed', reason: { kind: 'unreadable', message: 'state is not JSON' } },
 } satisfies Record<string, UploadState>;
 
 const events = {
@@ -83,7 +85,7 @@ type StateName = keyof typeof states;
 type EventName = keyof typeof events;
 
 const accepted: Record<StateName, EventName[]> = {
-  preparing: ['prepared', 'prepareFailed'],
+  preparing: ['prepared', 'prepareFailed', 'fileMissing'],
   waitingReady: ['sendStarted', 'fileMissing'],
   waitingEarly: ['fileMissing'],
   waitingMaybeSent: ['foundDocument', 'foundTask', 'notFound', 'reconcileFailed'],
@@ -100,6 +102,7 @@ const accepted: Record<StateName, EventName[]> = {
   failedConsumption: ['retryRequested'],
   failedFileMissing: [],
   failedPdf: [],
+  failedUnreadable: [],
 };
 
 const freshWait: UploadState = { kind: 'waiting', attempt: 0, notBefore: now, maybeSent: false };
@@ -108,6 +111,7 @@ describe('transitions the table accepts', () => {
   test.each<[StateName, UploadEvent, UploadState]>([
     ['preparing', events.prepared, freshWait],
     ['preparing', events.prepareFailed, { kind: 'failed', reason: { kind: 'pdf_failed', message: 'no pages' } }],
+    ['preparing', events.fileMissing, { kind: 'failed', reason: { kind: 'file_missing' } }],
     ['waitingReady', events.sendStarted, { kind: 'sending', attempt: 2, startedAt: now }],
     ['waitingReady', events.fileMissing, { kind: 'failed', reason: { kind: 'file_missing' } }],
     ['waitingEarly', events.fileMissing, { kind: 'failed', reason: { kind: 'file_missing' } }],
@@ -219,6 +223,20 @@ describe('transitions the table refuses', () => {
 
   test.each(refused)('%s refuses %s', (stateName, eventName) => {
     expect(() => transition(states[stateName], events[eventName], now)).toThrow(InvalidTransition);
+    expect(accepts(states[stateName], events[eventName], now)).toBe(false);
+  });
+});
+
+describe('accepts', () => {
+  const allowed: [StateName, EventName][] = [];
+  for (const stateName of Object.keys(states) as StateName[]) {
+    for (const eventName of accepted[stateName]) {
+      allowed.push([stateName, eventName]);
+    }
+  }
+
+  test.each(allowed)('%s accepts %s', (stateName, eventName) => {
+    expect(accepts(states[stateName], events[eventName], now)).toBe(true);
   });
 });
 
@@ -250,6 +268,7 @@ function jobIn(state: UploadState): UploadJob {
     id: JobId.parse('0190a000-0000-7000-8000-000000000001'),
     accountId: AccountId.parse('account'),
     batchId: BatchId.parse('0190a000-0000-7000-8000-000000000002'),
+    input: { kind: 'pages', pages: [{ uri: 'file:///page-1.jpg', rotation: 0 }] },
     pageCount: 1,
     now: 100,
     fields: {
@@ -306,6 +325,7 @@ describe('canDelete', () => {
     ['processing', false],
     ['done', true],
     ['failedConsumption', true],
+    ['failedUnreadable', true],
   ])('%s gives %s', (stateName, allowed) => {
     expect(canDelete(states[stateName])).toBe(allowed);
   });

@@ -45,6 +45,15 @@ export async function documentCount(): Promise<number> {
   return result.value.count;
 }
 
+export async function documentsNamed(filename: string): Promise<number> {
+  const response = await fetch(
+    `${serverUrl}/api/documents/?original_filename__iexact=${encodeURIComponent(filename)}&fields=id`,
+    { headers: { Authorization: `Token ${token}` } },
+  );
+  const body = (await response.json()) as { count: number };
+  return body.count;
+}
+
 export async function eventually<Value>(
   attempt: () => Promise<Value | null>,
   limitMs = 120_000,

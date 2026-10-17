@@ -25,7 +25,7 @@ import {
   type UploadClient,
 } from '../src/upload/runner';
 import { uuidV7 } from '../src/upload/uuid';
-import { client, clientWithToken, documentCount, serverUrl, token, uniqueName } from './helpers';
+import { client, clientWithToken, documentCount, documentsNamed, uniqueName } from './helpers';
 import { corruptPdf, syntheticPdf } from './synthetic-pdf';
 
 const folder = mkdtempSync(join(tmpdir(), 'waraq-upload-'));
@@ -54,6 +54,7 @@ async function queueJob(store: MemoryJobStore, title: string): Promise<UploadJob
     accountId: AccountId.parse('test-account'),
     batchId: BatchId.parse(uuidV7(now, randomBytes(10))),
     fields: fieldsTitled(title),
+    input: { kind: 'pages', pages: [{ uri: 'file:///page-1.jpg', rotation: 0 }] },
     pageCount: 1,
     now,
   });
@@ -96,15 +97,6 @@ async function runUntilSettled(job: UploadJob, deps: RunnerDeps<Blob>): Promise<
     }
     current = next;
   }
-}
-
-async function documentsNamed(filename: string): Promise<number> {
-  const response = await fetch(
-    `${serverUrl}/api/documents/?original_filename__iexact=${encodeURIComponent(filename)}&fields=id`,
-    { headers: { Authorization: `Token ${token}` } },
-  );
-  const body = (await response.json()) as { count: number };
-  return body.count;
 }
 
 describe('runStep against a real server', () => {

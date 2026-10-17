@@ -15,6 +15,12 @@ export type BatchId = z.infer<typeof BatchId>;
 export const AccountId = z.string().min(1).brand<'AccountId'>();
 export type AccountId = z.infer<typeof AccountId>;
 
+export type PageRotation = 0 | 90 | 180 | 270;
+
+export type JobInput =
+  | { kind: 'pages'; pages: { uri: string; rotation: PageRotation }[] }
+  | { kind: 'pdf'; uri: string };
+
 export type ResumePoint =
   | { step: 'send' }
   | { step: 'reconcile'; unsureSince: number }
@@ -26,7 +32,8 @@ export type FailureReason =
   | { kind: 'rejected'; status: number; message: string }
   | { kind: 'consumption_failed'; message: string }
   | { kind: 'file_missing' }
-  | { kind: 'pdf_failed'; message: string };
+  | { kind: 'pdf_failed'; message: string }
+  | { kind: 'unreadable'; message: string };
 
 export type UploadState =
   | { kind: 'preparing' }
@@ -49,6 +56,7 @@ export type UploadJob = {
   accountId: AccountId;
   batchId: BatchId;
   fields: UploadFields;
+  input: JobInput;
   pdfPath: string | null;
   pageCount: number;
   createdAt: number;
@@ -194,6 +202,7 @@ const transitions: TransitionTable = {
       kind: 'failed',
       reason: { kind: 'pdf_failed', message: event.message },
     }),
+    fileMissing: () => ({ kind: 'failed', reason: { kind: 'file_missing' } }),
   },
   waiting: {
     sendStarted: (state, _event, now) =>
@@ -260,9 +269,17 @@ const transitions: TransitionTable = {
   },
 };
 
-export function transition(state: UploadState, event: UploadEvent, now: number): UploadState {
+function nextState(state: UploadState, event: UploadEvent, now: number): UploadState | 'refused' {
   const handler = transitions[state.kind][event.kind] as Handler<StateKind, EventKind> | undefined;
-  const next = handler ? handler(state, event, now) : 'refused';
+  return handler ? handler(state, event, now) : 'refused';
+}
+
+export function accepts(state: UploadState, event: UploadEvent, now: number): boolean {
+  return nextState(state, event, now) !== 'refused';
+}
+
+export function transition(state: UploadState, event: UploadEvent, now: number): UploadState {
+  const next = nextState(state, event, now);
   if (next === 'refused') {
     throw new InvalidTransition(state, event);
   }
@@ -314,6 +331,7 @@ export function newUploadJob(details: {
   accountId: AccountId;
   batchId: BatchId;
   fields: UploadFields;
+  input: JobInput;
   pageCount: number;
   now: number;
 }): UploadJob {
@@ -322,6 +340,7 @@ export function newUploadJob(details: {
     accountId: details.accountId,
     batchId: details.batchId,
     fields: details.fields,
+    input: details.input,
     pdfPath: null,
     pageCount: details.pageCount,
     createdAt: details.now,
