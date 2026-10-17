@@ -7,11 +7,17 @@
 #   dev/android.sh install       install the APK on the emulator
 #   dev/android.sh shot <name>   save a screenshot as .dev-data/shots/<name>.png
 #   dev/android.sh logs          print the app's log lines
-#   dev/android.sh stop          stop this emulator and no other
+#   dev/android.sh adb <args>    run adb against this project's own adb server
+#   dev/android.sh stop          stop this emulator and its adb server, and nothing else
 #
 # JAVA_HOME and ANDROID_HOME come from the environment or from .dev-data/toolchain.env.
 # The SDK may belong to another project, so nothing here writes to it or downloads into it.
 # Everything the build and the emulator write stays in .dev-data/ and .avd/.
+#
+# Another project's adb server may already run on the default port 5037 with its own key.
+# This emulator registers only with an adb server of its own on ADB_PORT, and its console
+# ports sit above 5585, the last port adb servers scan for emulators, so the other server
+# never sees it.
 set -euo pipefail
 
 ROOT=$(cd "$(dirname "$0")/.." && pwd)
@@ -32,23 +38,30 @@ export PATH="$JAVA_HOME/bin:$ANDROID_HOME/platform-tools:$ANDROID_HOME/emulator:
 APK=$ROOT/android/app/build/outputs/apk/release/app-release.apk
 APP_ID=$(sed -nE 's/.*"androidPackage": "([^"]+)".*/\1/p' "$ROOT/src/brand.json")
 AVD=waraq_pixel
-CONSOLE_PORT=5560
+ADB_PORT=5038
+CONSOLE_PORT=5600
+ADB_DEVICE_PORT=5601
 GRPC_PORT=8564
+export ANDROID_ADB_SERVER_PORT=$ADB_PORT
 SERIAL=emulator-$CONSOLE_PORT
 BUILD_TOOLS=$ANDROID_HOME/build-tools/36.0.0
 LOGS=$DATA/logs
 SHOTS=$DATA/shots
 
-mkdir -p "$DATA/home" "$ANDROID_USER_HOME" "$ANDROID_AVD_HOME" "$LOGS" "$SHOTS"
+mkdir -p "$DATA/home" "$DATA/tmp" "$ANDROID_USER_HOME" "$ANDROID_AVD_HOME" "$LOGS" "$SHOTS"
 # adb and the emulator read and write their keys under $HOME/.android, whatever ANDROID_USER_HOME says.
 [ -e "$DATA/home/.android" ] || ln -s ../android-user "$DATA/home/.android"
 
+adb_server() {
+  HOME=$DATA/home TMPDIR=$DATA/tmp command adb -P "$ADB_PORT" "$@"
+}
+
 adb() {
-  HOME=$DATA/home command adb -s "$SERIAL" "$@"
+  adb_server -s "$SERIAL" "$@"
 }
 
 emulator() {
-  HOME=$DATA/home command emulator "$@"
+  HOME=$DATA/home TMPDIR=$DATA/tmp command emulator "$@"
 }
 
 build() {
@@ -118,7 +131,8 @@ boot() {
     create_avd
   fi
 
-  emulator -avd "$AVD" -port "$CONSOLE_PORT" -grpc "$GRPC_PORT" \
+  adb_server start-server
+  emulator -avd "$AVD" -ports "$CONSOLE_PORT,$ADB_DEVICE_PORT" -grpc "$GRPC_PORT" \
     -no-window -no-audio -no-boot-anim -no-snapshot -no-metrics -gpu host > "$LOGS/emulator.log" 2>&1 &
   disown
 
@@ -131,8 +145,7 @@ boot() {
   done
   is_booted || {
     echo "$SERIAL did not finish booting, see $LOGS/emulator.log" >&2
-    HOME=$DATA/home command adb devices | grep "^$SERIAL" >&2 || true
-    echo "unauthorized means an adb server started with another key is running" >&2
+    adb_server devices | grep "^$SERIAL" >&2 || true
     return 1
   }
   adb shell settings put global window_animation_scale 0
@@ -156,17 +169,22 @@ logs() {
 
 stop() {
   adb emu kill || true
+  adb_server kill-server || true
 }
 
 case "${1:-}" in
   build | badging | boot | install | logs | stop)
     "$1"
     ;;
+  adb)
+    shift
+    adb_server "$@"
+    ;;
   shot)
     shot "${2:?usage: $0 shot <name>}"
     ;;
   *)
-    sed -n '2,10p' "$0"
+    sed -n 's/^#   //p' "$0"
     exit 1
     ;;
 esac
