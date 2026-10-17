@@ -1,7 +1,9 @@
+import { fetch } from 'expo/fetch';
 import { createContext, type ReactNode, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 
 import { clearAccount, loadAccount, saveAccount } from './account/store';
 import type { StoredAccount } from './account/types';
+import { createPaperlessClient, type PaperlessClient } from './paperless/client';
 import { queryClient } from './query';
 
 export type SessionState =
@@ -63,3 +65,20 @@ export function useSignedIn(): StoredAccount {
   return state.stored;
 }
 
+// Uploads come in a later build, so this client takes no files.
+export type AppClient = PaperlessClient<never>;
+
+export function useClient(): AppClient {
+  const { account, secrets } = useSignedIn();
+  return useMemo(
+    () =>
+      createPaperlessClient<never>({
+        baseUrl: account.serverUrl,
+        auth: { kind: 'token', token: secrets.token },
+        extraHeaders: secrets.headerValues,
+        fetch,
+        appendFile: () => {},
+      }),
+    [account, secrets],
+  );
+}

@@ -56,6 +56,7 @@ const documentSummaryShape = {
   title: z.string(),
   created: IsoDate,
   added: z.string(),
+  modified: z.string(),
   correspondent: z.number().int().nullable(),
   document_type: z.number().int().nullable(),
   storage_path: z.number().int().nullable(),
@@ -74,6 +75,7 @@ function summaryFromWire(document: z.infer<z.ZodObject<typeof documentSummarySha
     title: document.title,
     created: document.created,
     added: document.added,
+    modified: document.modified,
     correspondentId: document.correspondent,
     documentTypeId: document.document_type,
     storagePathId: document.storage_path,
@@ -96,7 +98,6 @@ export type DocumentSummary = z.infer<typeof DocumentSummary>;
 export const DocumentDetail = z
   .object({
     ...documentSummaryShape,
-    modified: z.string(),
     mime_type: z.string(),
     owner: z.number().int().nullable(),
     user_can_change: z.boolean(),
@@ -104,7 +105,6 @@ export const DocumentDetail = z
   })
   .transform((document) => ({
     ...summaryFromWire(document),
-    modified: document.modified,
     mimeType: document.mime_type,
     ownerId: document.owner,
     userCanChange: document.user_can_change,

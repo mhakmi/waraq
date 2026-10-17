@@ -2,6 +2,7 @@ import brand from './brand.json';
 
 export const copy = {
   appName: brand.displayName,
+  locale: 'en-CA',
 
   shell: {
     inbox: 'Inbox',
@@ -9,6 +10,34 @@ export const copy = {
     uploads: 'Uploads',
     scan: 'Scan',
     back: 'Back',
+    account: 'Account',
+  },
+
+  account: {
+    signOutTitle: 'Sign out?',
+    signOutMessage: (username: string, host: string) => `You are signed in as ${username} on ${host}.`,
+    signOut: 'Sign out',
+    cancel: 'Cancel',
+  },
+
+  inbox: {
+    newCount: (count: number) => `${count} new`,
+    groups: { today: 'Today', week: 'This week', earlier: 'Earlier' },
+    meta: (correspondent: string | null, created: string) => `${correspondent ?? 'No correspondent'} · ${created}`,
+    emptyTitle: 'Your inbox is empty',
+    emptyLead: 'New documents show here when your server adds them.',
+    noInboxTagTitle: 'Your server has no inbox tag',
+    noInboxTagLead: 'In Paperless-ngx, edit a tag and turn on Inbox tag. New documents get it, and they show here.',
+    offlineTitle: 'You are offline',
+    offlineLead: 'The inbox loads when your phone is back online.',
+    errorTitle: 'The inbox could not load',
+    errors: {
+      network: 'Your server could not be reached. Check your connection, then try again.',
+      signedOut: 'The server no longer accepts this sign-in. Sign out and sign in again.',
+      forbidden: 'Your account may not view documents. Ask the server admin.',
+      other: 'Your server sent an answer that could not be read. Try again in a moment.',
+    },
+    tryAgain: 'Try again',
   },
 
   placeholder: {
