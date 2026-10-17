@@ -1,13 +1,15 @@
 import { beforeAll, describe, expect, test } from 'vitest';
 
+import { viewParameters } from '../src/documents/views';
 import { obtainToken } from '../src/paperless/client';
-import type { DocumentId, IsoDate } from '../src/paperless/schemas';
+import type { DocumentId, IsoDate, SavedView } from '../src/paperless/schemas';
 import {
   client,
   clientWithToken,
   createLabel,
   eventually,
   serverUrl,
+  token,
   uniqueName,
 } from './helpers';
 import { syntheticPdf } from './synthetic-pdf';
@@ -224,5 +226,44 @@ describe('editing', () => {
     expect(result).toEqual({ ok: true, value: null });
     const after = await client.getDocument(doomed);
     expect(after).toEqual({ ok: false, error: { kind: 'not_found' } });
+  });
+});
+
+describe('saved views', () => {
+  async function createView(rules: { rule_type: number; value: string | null }[]): Promise<SavedView> {
+    const response = await fetch(`${serverUrl}/api/saved_views/`, {
+      method: 'POST',
+      headers: { Authorization: `Token ${token}`, 'Content-Type': 'application/json', Accept: 'application/json; version=10' },
+      body: JSON.stringify({ name: uniqueName('view'), sort_field: 'created', sort_reverse: false, filter_rules: rules }),
+    });
+    if (!response.ok) {
+      throw new Error(`Could not create a view: ${response.status} ${await response.text()}`);
+    }
+    const { id } = (await response.json()) as { id: number };
+    const views = await client.listSavedViews();
+    const view = views.ok ? views.value.find((item) => item.id === id) : undefined;
+    if (view === undefined) {
+      throw new Error('The new view is not in the list');
+    }
+    return view;
+  }
+
+  test("a view's rules filter and order the list as the server's web app would", async () => {
+    const marker = uniqueName('view').replace(/-/g, '');
+    const tag = await createLabel('tags', uniqueName('viewtag'));
+    const older = await uploadAndWait(`${marker} older`, [tag], '2025-03-01' as IsoDate);
+    const newer = await uploadAndWait(`${marker} newer`, [tag], '2026-03-01' as IsoDate);
+    await uploadAndWait(`${marker} before range`, [tag], '2024-03-01' as IsoDate);
+
+    const view = await createView([
+      { rule_type: 6, value: String(tag) },
+      { rule_type: 44, value: '2025-01-01' },
+    ]);
+    const parameters = viewParameters(view);
+    if (!parameters.ok) {
+      throw new Error(`unknown rule types ${parameters.unknownRuleTypes}`);
+    }
+    const result = await client.listDocuments({ savedViewDefaults: parameters.parameters });
+    expect(result.ok && result.value.items.map((document) => document.id)).toEqual([older, newer]);
   });
 });
