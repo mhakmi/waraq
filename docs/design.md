@@ -129,7 +129,7 @@ flowchart TD
 
 1. **Scan.** Google's scanner opens. It finds the edges, crops, straightens, takes several pages, and offers filters. It is Google's screen, so the app cannot style it. The app needs no camera permission.
 2. **Batch.** When the scanner returns, the pages become one document in the batch. Two buttons follow: "Add pages to this document" and "Scan the next document". Each document shows a strip of its pages.
-3. **Page editor.** Tap a document to see its pages in a grid. Drag to reorder. A page's menu has Retake, Rotate, Delete, and Move to another document. "Split into two documents here" sits between pages, for when the user scanned two letters in one go.
+3. **Page editor.** Tap a document to see its pages in a grid. A page's menu has Retake, Rotate, Move earlier, Move later, Move to another document, and Delete. "Split into two documents here" sits between pages, for when the user scanned two letters in one go.
 4. **Batch details.** Here the directions differ.
    - **Direction A, shared first.** One screen. A section at the top, "For every document", holds tags, correspondent, type, and storage path. Below it is one card per document with its title and any field set only for that document. A shared value shows as a muted "From the batch". Tapping it sets a value for that one document.
    - **Direction B, one at a time.** A pager with one document per page and all its fields. Each field has a "Use for all documents" switch.
@@ -282,11 +282,13 @@ type SavedView = { id: SavedViewId; name: string; filter: DocumentFilter; showIn
 
 type ScannedPage = {
 	id: PageId;
-	path: string;                  // a JPEG copied out of the scanner's cache folder
+	uri: string;                   // a JPEG moved out of the scanner's cache folder into files/batch/
 	width: number;
 	height: number;
-	rotation: 0 | 90 | 180 | 270;
+	rotation: 0 | 90 | 180 | 270;  // turned by the user, clockwise
 };
+
+type PdfFile = { uri: string; name: string; pageCount: number; thumbnailUri: string };
 
 type DocumentMetadata = {
 	title?: string;
@@ -299,7 +301,9 @@ type DocumentMetadata = {
 	customFields?: CustomFieldValue[];
 };
 
-type DraftDocument = { id: JobId; pages: ScannedPage[]; metadata: DocumentMetadata };
+type DraftDocument =                // a scan or picked photos, or a PDF shared or picked as is
+	| { kind: 'pages'; id: JobId; pages: ScannedPage[]; metadata: DocumentMetadata }
+	| { kind: 'pdf'; id: JobId; pdf: PdfFile; metadata: DocumentMetadata };
 
 type Batch = {
 	id: BatchId;
@@ -390,7 +394,7 @@ flowchart LR
 
 - The Paperless client is plain TypeScript with no React Native import. It takes `fetch` as an argument, so tests run it in Node against a real server.
 - The state machine and the runner are plain TypeScript too. The runner is the only code that writes jobs.
-- Building the PDF. The plan is a small writer that places each page's JPEG bytes in the PDF as they are, without decoding or re-encoding. Quality stays as the scanner made it, and memory holds one page at a time. That must be measured on a phone with a 30-page document before it is trusted. The fallback is the same writer in Kotlin inside the scanner module.
+- Building the PDF. `writePdf` in the scanner module is a small Kotlin writer that places each page's JPEG bytes in the PDF as they are, and turns a page with the PDF's own `/Rotate`. Quality stays as the scanner made it, and the writer streams to disk, so memory holds at most one page. Android's `PdfDocument` was tried first and measured on the emulator: it keeps every page's bitmap until the end and stores them losslessly, so 10 pages of 300 dpi grain came to 99.9 MB with 348 MB of native memory, and 30 pages to 1.09 GB. The same 10 pages through the JPEG writer come to 25.3 MB, the size of the JPEGs plus about 500 bytes a page, with no growth in native memory.
 
 ## Stack
 
@@ -473,7 +477,7 @@ Phase 2 is the first build that replaces paperless-mobile for daily use. Phase 1
 
 ## Shared with Daftar
 
-Both apps open the same scanner, and Daftar's spike lists three gaps in the wrapper it used. It cannot ask whether the scanner is available, cannot fetch the scanner module ahead of time, and fixes the mode and the output format. Waraq needs the same fixes and also needs to build a PDF from pages. One Expo module could serve both apps: availability check, early download, page limit, mode, gallery import, typed errors, JPEG or PDF output, and the JPEG-to-PDF writer. That makes it a candidate for a package of its own.
+Both apps open the same scanner, and Daftar's spike lists three gaps in the wrapper it used. It cannot ask whether the scanner is available, cannot fetch the scanner module ahead of time, and fixes the mode and the output format. Waraq needs the same fixes and also needs to build a PDF from pages. One Expo module could serve both apps: availability check, early download, page limit, mode, gallery import, typed errors, JPEG or PDF output, and the JPEG-to-PDF writer. That makes it a candidate for a package of its own. Waraq's copy lives in `modules/scanner/` and imports nothing from Waraq: it takes the folder to write pages into as an argument, and its Kotlin package is `dev.mhakmi.scanner`.
 
 The upload queue has the same shape in both apps, but the servers differ. Daftar's server has an upload protocol built to be retried, and Paperless-ngx does not. Sharing it now would mean an abstraction over two protocols with one user each, so it stays in each app for now.
 
