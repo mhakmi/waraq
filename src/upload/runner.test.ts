@@ -11,7 +11,7 @@ const offlineClient: UploadClient<string> = {
   postDocument: unreachable,
   getTask: unreachable,
   findDocumentByOriginalFilename: unreachable,
-  findUnfinishedConsumeTask: unreachable,
+  findConsumeTaskByFilename: unreachable,
 };
 
 function jobIn(state: UploadState, pdfPath: string | null): UploadJob {

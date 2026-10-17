@@ -50,17 +50,64 @@ describe('getTask with responses recorded from Paperless-ngx 3.3.2', () => {
   });
 });
 
-describe('findUnfinishedConsumeTask', () => {
-  test('matches the uploaded file name', async () => {
-    const filename = pending.results[0].input_data.filename;
-    expect(await clientAnswering(pending).findUnfinishedConsumeTask(filename)).toEqual({
+function clientPaging(pages: unknown[]) {
+  const requests: URL[] = [];
+  const paging = createPaperlessClient({
+    baseUrl: 'https://paperless.example.com' as ServerUrl,
+    auth: { kind: 'token', token: 'token' },
+    fetch: async (input) => {
+      const url = new URL(String(input));
+      requests.push(url);
+      const page = Number(url.searchParams.get('page') ?? '1');
+      return new Response(JSON.stringify(pages[page - 1]), { status: 200 });
+    },
+    appendFile: () => {},
+  });
+  return { paging, requests };
+}
+
+const createdAfter = new Date('2026-10-15T12:00:00Z');
+
+describe('findConsumeTaskByFilename', () => {
+  test('asks for consume tasks since the bound, newest first, whatever their status', async () => {
+    const { paging, requests } = clientPaging([pending]);
+
+    await paging.findConsumeTaskByFilename('other.pdf', createdAfter);
+
+    expect(requests).toHaveLength(1);
+    const query = requests[0].searchParams;
+    expect(query.get('task_type')).toBe('consume_file');
+    expect(query.get('date_created_after')).toBe('2026-10-15T12:00:00.000Z');
+    expect(query.get('ordering')).toBe('-date_created');
+    expect(query.has('is_complete')).toBe(false);
+  });
+
+  test('matches a finished task as well as a pending one', async () => {
+    const filename = success.results[0].input_data.filename;
+    const { paging } = clientPaging([success]);
+
+    expect(await paging.findConsumeTaskByFilename(filename, createdAfter)).toEqual({
       ok: true,
-      value: pending.results[0].task_id,
+      value: success.results[0].task_id,
     });
   });
 
+  test('reads past the first page', async () => {
+    const filename = pending.results[0].input_data.filename;
+    const firstPage = { ...success, next: 'https://paperless.example.com/api/tasks/?page=2' };
+    const { paging, requests } = clientPaging([firstPage, pending]);
+
+    expect(await paging.findConsumeTaskByFilename(filename, createdAfter)).toEqual({
+      ok: true,
+      value: pending.results[0].task_id,
+    });
+    expect(requests.map((url) => url.searchParams.get('page'))).toEqual(['1', '2']);
+  });
+
   test('returns null when no task has that file name', async () => {
-    expect(await clientAnswering(pending).findUnfinishedConsumeTask('other.pdf')).toEqual({
+    const { paging } = clientPaging([pending]);
+
+    expect(await paging.findConsumeTaskByFilename('other.pdf', createdAfter)).toEqual({
       ok: true,
       value: null,
     });

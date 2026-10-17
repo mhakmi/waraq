@@ -423,16 +423,17 @@ export function createPaperlessClient<File>(options: ClientOptions<File>) {
       return success(taskStatus(result.value.items[0]));
     },
 
-    async findUnfinishedConsumeTask(filename: string): Promise<Result<TaskId | null>> {
+    async findConsumeTaskByFilename(filename: string, createdAfter: Date): Promise<Result<TaskId | null>> {
       const result = await listAll(connection, 'tasks/', Task, {
         task_type: 'consume_file',
-        is_complete: false,
+        date_created_after: createdAfter.toISOString(),
+        ordering: '-date_created',
       });
       if (!result.ok) {
         return result;
       }
-      const match = result.value.find((task) => task.input_data.filename === filename);
-      return success(match?.task_id ?? null);
+      const newest = result.value.find((task) => task.input_data.filename === filename);
+      return success(newest?.task_id ?? null);
     },
   };
 }

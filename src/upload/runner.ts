@@ -35,8 +35,10 @@ export class MemoryJobStore implements JobStore {
 
 export type UploadClient<File> = Pick<
   PaperlessClient<File>,
-  'postDocument' | 'getTask' | 'findDocumentByOriginalFilename' | 'findUnfinishedConsumeTask'
+  'postDocument' | 'getTask' | 'findDocumentByOriginalFilename' | 'findConsumeTaskByFilename'
 >;
+
+const day = 24 * 60 * 60 * 1000;
 
 export type RunnerDeps<File> = {
   client: UploadClient<File>;
@@ -60,7 +62,7 @@ async function prepare<File>(job: UploadJob, deps: RunnerDeps<File>): Promise<Up
 
 async function reconcile<File>(job: UploadJob, client: UploadClient<File>): Promise<UploadEvent> {
   const filename = uploadFilename(job.id);
-  const task = await client.findUnfinishedConsumeTask(filename);
+  const task = await client.findConsumeTaskByFilename(filename, new Date(job.createdAt - day));
   if (!task.ok) {
     return { kind: 'reconcileFailed' };
   }
