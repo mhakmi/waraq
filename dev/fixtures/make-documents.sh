@@ -1,5 +1,5 @@
 #!/bin/bash
-# Renders the synthetic sample documents in documents.tsv to PDF with headless Chrome.
+# Renders the synthetic sample documents in documents.tsv to PDF and PNG with headless Chrome.
 # Every company, person, and amount in them is made up.
 set -euo pipefail
 
@@ -21,6 +21,8 @@ tail -n +2 "$HERE/documents.tsv" | while IFS=$'\t' read -r file title sender dat
 HTML
   "$CHROME" --headless --disable-gpu --user-data-dir="$PROFILE" --no-pdf-header-footer \
     --print-to-pdf="$OUT/$file.pdf" "file://$html" > /dev/null 2>&1
+  "$CHROME" --headless --disable-gpu --hide-scrollbars --user-data-dir="$PROFILE" --window-size=1240,1754 \
+    --screenshot="$OUT/$file.png" "file://$html" > /dev/null 2>&1
   rm "$html"
 done
 rm -rf "$PROFILE"

@@ -7,6 +7,7 @@
 #   dev/android.sh install       install the APK on the emulator
 #   dev/android.sh shot <name>   save a screenshot as .dev-data/shots/<name>.png
 #   dev/android.sh flow          sign in, search, edit a title, and mark a document done, then the key screens in dark and large text
+#   dev/android.sh scan          scan two documents, rotate and split, set a shared tag, stop at Upload, then share a PDF in
 #   dev/android.sh pdf-check     run the PDF writer's checks on the emulator, then open its 10-page PDF on the Mac
 #   dev/android.sh logs          print the app's log lines
 #   dev/android.sh adb <args>    run adb against this project's own adb server
@@ -49,6 +50,8 @@ SERIAL=emulator-$CONSOLE_PORT
 BUILD_TOOLS=$ANDROID_HOME/build-tools/36.0.0
 LOGS=$DATA/logs
 SHOTS=$DATA/shots
+POSTER=$ROOT/dev/fixtures/pdf/lease-renewal.png
+GRPCURL=${GRPCURL:-grpcurl}
 
 mkdir -p "$DATA/home" "$DATA/tmp" "$ANDROID_USER_HOME" "$ANDROID_AVD_HOME" "$LOGS" "$SHOTS"
 # adb and the emulator read and write their keys under $HOME/.android, whatever ANDROID_USER_HOME says.
@@ -114,7 +117,7 @@ disk.dataPartition.size=6G
 hw.keyboard=yes
 hw.gpu.enabled=yes
 hw.gpu.mode=host
-hw.camera.back=none
+hw.camera.back=virtualscene
 hw.camera.front=none
 hw.audioInput=no
 EOF
@@ -133,8 +136,10 @@ boot() {
     create_avd
   fi
 
+  [ -f "$POSTER" ] || "$ROOT/dev/fixtures/make-documents.sh" > /dev/null
   adb_server start-server
   emulator -avd "$AVD" -ports "$CONSOLE_PORT,$ADB_DEVICE_PORT" -grpc "$GRPC_PORT" \
+    -camera-back virtualscene -virtualscene-poster "wall=$POSTER" \
     -no-window -no-audio -no-boot-anim -no-snapshot -no-metrics -gpu host > "$LOGS/emulator.log" 2>&1 &
   disown
 
@@ -153,6 +158,7 @@ boot() {
   adb shell settings put global window_animation_scale 0
   adb shell settings put global transition_animation_scale 0
   adb shell settings put global animator_duration_scale 0
+  adb shell settings put secure immersive_mode_confirmations confirmed
   echo "$SERIAL booted"
 }
 
@@ -424,6 +430,160 @@ flow() {
   echo "flow passed, screenshots in $SHOTS"
 }
 
+# The scanner's camera follows the emulator's physical model: a position in metres and a rotation
+# in degrees. The poster hangs on the wall of the virtual room near x -0.8, z 5.3.
+set_physical_model() {
+  "$GRPCURL" -plaintext -import-path "$ANDROID_HOME/emulator/lib" -proto emulator_controller.proto \
+    -d "{\"target\":\"$1\",\"value\":{\"data\":[$2,$3,$4]}}" \
+    "localhost:$GRPC_PORT" android.emulation.control.EmulatorController/setPhysicalModel > /dev/null
+}
+
+face_poster() {
+  set_physical_model POSITION -1.6 0.3 3.4
+  set_physical_model ROTATION 0 210 0
+}
+
+face_blank_wall() {
+  set_physical_model POSITION 0 0 0
+  set_physical_model ROTATION 0 135 0
+}
+
+# Google's scanner opens in auto capture and takes a page as soon as it sees one,
+# so it opens on a blank wall and takes each page by hand.
+capture_pages() {
+  local run=$1 count=$2 page
+  wait_for "Capture" 240
+  sleep 2
+  shot "$run-scanner"
+  tap "Manual" || true
+  for page in $(seq 1 "$count"); do
+    if [ "$page" -gt 1 ]; then
+      face_blank_wall
+      tap "Add page."
+      wait_for "Capture" 30
+      tap "Manual" || true
+    fi
+    face_poster
+    sleep 3
+    tap "Capture"
+    wait_for "Page $page of $page. Selected." 30
+  done
+  shot "$run-scanner-pages"
+  tap "Next"
+}
+
+scan_batch() {
+  local run=$1
+  face_blank_wall
+  tap "Scan"
+  capture_pages "$run-1" 2
+  wait_for "Document 1" 30
+  sleep 1
+  shot "$run-2-batch-one"
+
+  face_blank_wall
+  tap "Scan the next document"
+  capture_pages "$run-3" 1
+  wait_for "Document 2" 30
+  sleep 1
+  shot "$run-4-batch-two"
+
+  tap "Edit pages of document 1"
+  wait_for "Page 2" 10
+  sleep 1
+  shot "$run-5-editor"
+  tap "Menu for page 2"
+  wait_for "Rotate" 5
+  shot "$run-6-page-menu"
+  tap "Rotate"
+  sleep 1
+  shot "$run-7-rotated"
+  tap "Split into two documents after page 1"
+  sleep 1
+  shot "$run-8-split"
+  tap "Done"
+  wait_for "Document 3" 10
+  sleep 1
+  shot "$run-9-batch-three"
+
+  tap "Review and upload 3 documents"
+  wait_for "For every document" 10
+  shot "$run-10-details"
+  tap "Tags, Your server chooses"
+  wait_for "Bills" 10
+  tap "Bills"
+  tap "Done"
+  wait_for "Upload 3 documents" 10
+  sleep 1
+  shot "$run-11-details-tagged"
+  scroll_to "Document 3"
+  shot "$run-12-details-documents"
+}
+
+scan_key_screens() {
+  local run=$1
+  adb shell am force-stop "$APP_ID"
+  adb shell monkey -p "$APP_ID" -c android.intent.category.LAUNCHER 1 > /dev/null 2>&1
+  wait_for "Scan" 30
+  tap "Scan"
+  wait_for "Continue your batch?" 10
+  shot "$run-1-continue"
+  tap "CONTINUE"
+  wait_for "Document 3" 10
+  sleep 1
+  shot "$run-2-batch"
+  tap "Edit pages of document 2"
+  wait_for "Page 1" 10
+  sleep 1
+  shot "$run-3-editor"
+  press_back
+  tap "Review and upload 3 documents"
+  wait_for "For every document" 10
+  sleep 1
+  shot "$run-4-details"
+  scroll_to "Document 3"
+  shot "$run-5-details-documents"
+  press_back
+  press_back
+}
+
+share_pdf() {
+  local run=$1
+  local name=hydro-bill-august.pdf media_id
+  adb push "$ROOT/dev/fixtures/pdf/$name" "/sdcard/Download/$name" > /dev/null
+  adb shell am broadcast -a android.intent.action.MEDIA_SCANNER_SCAN_FILE -d "file:///sdcard/Download/$name" > /dev/null
+  media_id=$(adb shell content query --uri content://media/external/file --projection _id \
+    --where "\"_display_name='$name'\"" | sed -nE 's/.*_id=([0-9]+).*/\1/p' | head -1)
+  # am grants read access only to the intent's data, so the PDF goes in both the data and the stream.
+  adb shell am start -a android.intent.action.SEND -t application/pdf \
+    -d "content://media/external/file/$media_id" --eu android.intent.extra.STREAM "content://media/external/file/$media_id" \
+    --grant-read-uri-permission -n "$APP_ID/.MainActivity" > /dev/null
+  wait_for "Document 4" 20
+  sleep 1
+  shot "$run-1-shared-pdf"
+}
+
+scan() {
+  trap reset_display EXIT
+  reset_display
+  adb shell pm clear "$APP_ID" > /dev/null
+  see_inbox scan-signin
+  scan_batch scan-light
+  press_back
+  press_back
+
+  adb shell cmd uimode night yes > /dev/null
+  scan_key_screens scan-dark
+  reset_display
+
+  adb shell settings put system font_scale 1.3
+  scan_key_screens scan-large-text
+  reset_display
+
+  share_pdf share
+  echo "scan flow passed, screenshots in $SHOTS"
+}
+
 pdf_check() {
   cd "$ROOT/android"
   ./gradlew :scanner:assembleDebugAndroidTest \
@@ -454,7 +614,7 @@ stop() {
 }
 
 case "${1:-}" in
-  build | badging | boot | install | flow | logs | stop)
+  build | badging | boot | install | flow | scan | logs | stop)
     "$1"
     ;;
   pdf-check)
