@@ -475,13 +475,15 @@ Both apps open the same scanner, and Daftar's spike lists three gaps in the wrap
 
 The upload queue has the same shape in both apps, but the servers differ. Daftar's server has an upload protocol built to be retried, and Paperless-ngx does not. Sharing it now would mean an abstraction over two protocols with one user each, so it stays in each app for now.
 
-## Open decisions for the owner
+## Decisions
 
-1. **The name.** "Waraq" is a working name. The Play package name is fixed once the app exists in Play Console. Recommendation: confirm Waraq, with the package `dev.mhakmi.waraq`.
-2. **Layout direction.** A (three tabs, Inbox first) or B (one home). Recommendation: A. Inbox triage is the daily task, and paperless-mobile users already know a bottom bar. B is the better pick if he mostly scans and rarely files.
-3. **Batch details direction.** A (shared fields first) or B (one document at a time). Recommendation: A. Most batches share a correspondent or tags, and one screen shows the whole batch.
-4. **HTTP servers.** Allow plain HTTP with a warning, or refuse it. Allowing it means the data safety form says data is not always encrypted in transit. Recommendation: allow it for private addresses only (home network ranges, `.local`, and Tailscale's `100.64.0.0/10` range), refuse it for public ones, and suggest Tailscale's HTTPS certificates in the warning.
-5. **A demo server for Play review.** Needs a DNS name such as `demo.waraq.mhakmi.dev` and a deploy on his VPS. Recommendation: yes, before the closed test in phase 4.
-6. **Twelve testers.** Google needs 12 people opted in for 14 days. Recommendation: recruit from the r/selfhosted and Paperless-ngx communities with a public sign-up, since paperless-mobile users have no working app today.
-7. **F-Droid or GitHub releases.** Also ship signed APKs outside Play. Self-hosters often prefer F-Droid. Android's developer verification would need his own signing key registered before the 2027 rollout. Recommendation: GitHub releases from phase 4, F-Droid later.
-8. **One account or several.** The data shapes allow several servers. Recommendation: one active account in the first release, with switching in a later phase.
+The owner answered the open questions on 2026-10-17.
+
+1. **Name.** Waraq, with the package `dev.mhakmi.waraq`.
+2. **Layout.** Direction A: Inbox, Documents, and Uploads tabs, with a Scan button above the bar. Inbox is the start screen.
+3. **Batch details.** Direction A: shared fields first, then one card per document.
+4. **HTTP servers.** Allowed for private addresses only (home network ranges, `.local`, and Tailscale's `100.64.0.0/10`), with a warning that suggests HTTPS. Refused for public addresses.
+5. **Demo server for Play review.** Yes. The owner sets it up when the Play account exists and his own testing is done, before the app is submitted.
+6. **Twelve testers.** Still open. The owner asked how recruiting works.
+7. **Releases outside Play.** Signed APKs on the GitHub releases page, beside Google Play. F-Droid is not planned.
+8. **Accounts.** One server account in the first release. Several accounts come later. The data shapes already allow them.
