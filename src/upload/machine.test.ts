@@ -13,6 +13,7 @@ import {
   nextStep,
   failedCheckLimit,
   pollDelay,
+  previewImage,
   sendRetryDelay,
   sentGraceWindow,
   stepIsDue,
@@ -329,5 +330,20 @@ describe('canDelete', () => {
     ['failedUnreadable', true],
   ])('%s gives %s', (stateName, allowed) => {
     expect(canDelete(states[stateName])).toBe(allowed);
+  });
+});
+
+describe('previewImage', () => {
+  test('is the first page as it was turned, or a shared PDF thumbnail', () => {
+    const pages = [
+      { uri: 'file:///pages/1-1.jpg', rotation: 90 as const },
+      { uri: 'file:///pages/1-2.jpg', rotation: 0 as const },
+    ];
+    expect(previewImage({ kind: 'pages', pages })).toEqual({ uri: 'file:///pages/1-1.jpg', rotation: 90 });
+    expect(previewImage({ kind: 'pdf', uri: 'file:///batch/shared.pdf', thumbnailUri: 'file:///batch/shared.jpg' })).toEqual({
+      uri: 'file:///batch/shared.jpg',
+      rotation: 0,
+    });
+    expect(previewImage({ kind: 'pages', pages: [] })).toBeNull();
   });
 });

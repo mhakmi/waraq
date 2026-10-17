@@ -4,6 +4,7 @@ import { type Batch, type DraftDocument, pageCount, resolveUploadFields } from '
 import {
   accepts,
   type AccountId,
+  previewImage,
   type JobId,
   type JobInput,
   newUploadJob,
@@ -69,13 +70,25 @@ function pageFiles(input: JobInput): string[] {
   return input.kind === 'pages' ? input.pages.map((page) => page.uri) : [];
 }
 
+function pagesBesidesThePreview(input: JobInput): string[] {
+  const preview = previewImage(input);
+  return pageFiles(input).filter((uri) => uri !== preview?.uri);
+}
+
 function sentFiles(job: UploadJob): string[] {
-  const files = job.input.kind === 'pdf' ? [job.input.uri, job.input.thumbnailUri] : [];
-  return Array.from(new Set(job.pdfPath === null ? files : [...files, job.pdfPath]));
+  const files = job.input.kind === 'pdf' ? [job.input.uri] : [];
+  const preview = previewImage(job.input);
+  if (preview !== null) {
+    files.push(preview.uri);
+  }
+  if (job.pdfPath !== null) {
+    files.push(job.pdfPath);
+  }
+  return Array.from(new Set(files));
 }
 
 function jobFiles(job: UploadJob): string[] {
-  return [...pageFiles(job.input), ...sentFiles(job)];
+  return Array.from(new Set([...pageFiles(job.input), ...sentFiles(job)]));
 }
 
 function pagesNoLongerNeeded(before: UploadJob, after: UploadJob): boolean {
@@ -152,7 +165,7 @@ export function createUploadQueue<File>(deps: UploadQueueDeps<File>): UploadQueu
 
   async function afterStep(before: UploadJob, after: UploadJob): Promise<void> {
     if (pagesNoLongerNeeded(before, after)) {
-      await removeFiles(pageFiles(after.input));
+      await removeFiles(pagesBesidesThePreview(after.input));
     }
     if (after.state.kind === 'done') {
       await removeFiles(sentFiles(after));

@@ -146,22 +146,22 @@ describe('run', () => {
     expect(h.wakes).toEqual([null]);
   });
 
-  test('removes the page files once the PDF is built and the PDF once the job is done', async () => {
+  test('removes all but the first page once the PDF is built, and the first page and the PDF once the job is done', async () => {
     const h = harness();
     await h.store.insert(jobIn(1, { kind: 'preparing' }));
     const queue = createUploadQueue(h.deps);
 
     await queue.run();
-    expect(h.removed).toEqual(['file:///pages/1-1.jpg', 'file:///pages/1-2.jpg']);
+    expect(h.removed).toEqual(['file:///pages/1-2.jpg']);
     expect((await stored(h.store, 1))?.state.kind).toBe('processing');
 
     h.clock.now += 2000;
     await queue.run();
     expect((await stored(h.store, 1))?.state).toEqual({ kind: 'done', documentId });
-    expect(h.removed).toEqual(['file:///pages/1-1.jpg', 'file:///pages/1-2.jpg', `/uploads/${jobId(1)}.pdf`]);
+    expect(h.removed).toEqual(['file:///pages/1-2.jpg', 'file:///pages/1-1.jpg', `/uploads/${jobId(1)}.pdf`]);
   });
 
-  test('removes the page files when a page is missing, so the rest do not linger', async () => {
+  test('removes all but the first page when a page is missing, so the rest do not linger', async () => {
     const h = harness();
     h.deps.buildPdf = async () => failure({ kind: 'file_missing' });
     await h.store.insert(jobIn(1, { kind: 'preparing' }));
@@ -169,7 +169,7 @@ describe('run', () => {
     await createUploadQueue(h.deps).run();
 
     expect((await stored(h.store, 1))?.state).toEqual({ kind: 'failed', reason: { kind: 'file_missing' } });
-    expect(h.removed).toEqual(['file:///pages/1-1.jpg', 'file:///pages/1-2.jpg']);
+    expect(h.removed).toEqual(['file:///pages/1-2.jpg']);
   });
 
   test('a PDF that failed to build keeps its pages, and a retry builds it from them', async () => {
@@ -187,7 +187,7 @@ describe('run', () => {
     await queue.retry(jobId(1));
     await queue.run();
     expect((await stored(h.store, 1))?.state.kind).toBe('processing');
-    expect(h.removed).toEqual(['file:///pages/1-1.jpg', 'file:///pages/1-2.jpg']);
+    expect(h.removed).toEqual(['file:///pages/1-2.jpg']);
   });
 
   test('a shared PDF and its thumbnail go when the job is done', async () => {

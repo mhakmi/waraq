@@ -17,9 +17,16 @@ export type BatchId = z.infer<typeof BatchId>;
 
 export type PageRotation = 0 | 90 | 180 | 270;
 
-export type JobInput =
-  | { kind: 'pages'; pages: { uri: string; rotation: PageRotation }[] }
-  | { kind: 'pdf'; uri: string; thumbnailUri: string };
+export type PageImage = { uri: string; rotation: PageRotation };
+
+export type JobInput = { kind: 'pages'; pages: PageImage[] } | { kind: 'pdf'; uri: string; thumbnailUri: string };
+
+export function previewImage(input: JobInput): PageImage | null {
+  if (input.kind === 'pdf') {
+    return { uri: input.thumbnailUri, rotation: 0 };
+  }
+  return input.pages[0] ?? null;
+}
 
 export type ResumePoint =
   | { step: 'send' }
