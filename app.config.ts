@@ -19,6 +19,11 @@ const config: ExpoConfig = {
       'android.permission.USE_BIOMETRIC',
       'android.permission.USE_FINGERPRINT',
     ],
+    intentFilters: ['SEND', 'SEND_MULTIPLE'].map((action) => ({
+      action,
+      category: ['DEFAULT'],
+      data: [{ mimeType: 'application/pdf' }, { mimeType: 'image/*' }],
+    })),
   },
   plugins: ['expo-router', './plugins/network-security.ts'],
 };
