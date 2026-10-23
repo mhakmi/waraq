@@ -2,9 +2,12 @@
 # Builds Waraq for Android and runs it on a headless emulator of its own.
 #
 #   dev/android.sh build         generate android/ and build the release APK for arm64-v8a
+#   dev/android.sh bundle        build the release app bundle for Google Play, signed with the upload key, then check it
+#   dev/android.sh bundle --reuse-version-code   the same, for a versionCode already built for upload
 #   dev/android.sh badging       print the APK's package, versions, SDK levels, and permissions
 #   dev/android.sh boot          boot the waraq_pixel emulator headless, creating it if missing
 #   dev/android.sh install       install the APK on the emulator
+#   dev/android.sh install-bundle [aab]  install the newest bundle's APKs for this emulator, as Google Play would
 #   dev/android.sh shot <name>   save a screenshot as .dev-data/shots/<name>.png
 #   dev/android.sh flow          sign in, search, edit a title, and mark a document done, then the key screens in dark and large text
 #   dev/android.sh scan          scan two documents, rotate and split, set a shared tag, stop at Upload, then share a PDF in
@@ -46,6 +49,9 @@ export ANDROID_USER_HOME=$DATA/android-user
 export PATH="$JAVA_HOME/bin:$ANDROID_HOME/platform-tools:$ANDROID_HOME/emulator:$PATH"
 
 APK=$ROOT/android/app/build/outputs/apk/release/app-release.apk
+AAB=$ROOT/android/app/build/outputs/bundle/release/app-release.aab
+BUNDLES=$DATA/bundles
+LAST_VERSION_CODE=$DATA/last-version-code
 APP_ID=$(sed -nE 's/.*"androidPackage": "([^"]+)".*/\1/p' "$ROOT/src/brand.json")
 AVD=waraq_pixel
 ADB_PORT=5038
@@ -103,10 +109,14 @@ emulator() {
   HOME=$DATA/home TMPDIR=$DATA/tmp command emulator "$@"
 }
 
-build() {
+prebuild() {
   cd "$ROOT"
   bun install > "$LOGS/bun-install.log" 2>&1
   CI=1 bunx expo prebuild --platform android --clean --no-install > "$LOGS/prebuild.log" 2>&1
+}
+
+build() {
+  prebuild
   cd "$ROOT/android"
   ./gradlew assembleRelease \
     -PreactNativeArchitectures=arm64-v8a \
@@ -118,6 +128,118 @@ build() {
   }
   echo "$APK"
   badging
+}
+
+UPLOAD_KEY_VARIABLES=(WARAQ_UPLOAD_STORE_FILE WARAQ_UPLOAD_KEY_ALIAS WARAQ_UPLOAD_STORE_PASSWORD WARAQ_UPLOAD_KEY_PASSWORD)
+UPLOAD_KEY=no
+
+load_upload_key() {
+  local name count=0
+  if [ -f "$DATA/signing.env" ]; then
+    source "$DATA/signing.env"
+  fi
+  for name in "${UPLOAD_KEY_VARIABLES[@]}"; do
+    if [ -n "${!name:-}" ]; then
+      count=$((count + 1))
+    fi
+  done
+  if [ "$count" = 0 ]; then
+    return 0
+  fi
+  if [ "$count" != "${#UPLOAD_KEY_VARIABLES[@]}" ]; then
+    echo "Set all of ${UPLOAD_KEY_VARIABLES[*]}, or none of them." >&2
+    return 1
+  fi
+  if [ ! -f "$WARAQ_UPLOAD_STORE_FILE" ]; then
+    echo "There is no keystore at $WARAQ_UPLOAD_STORE_FILE." >&2
+    return 1
+  fi
+  # Gradle would read a relative path from android/app, so the path is made absolute here.
+  WARAQ_UPLOAD_STORE_FILE=$(cd "$(dirname "$WARAQ_UPLOAD_STORE_FILE")" && pwd)/$(basename "$WARAQ_UPLOAD_STORE_FILE")
+  export "${UPLOAD_KEY_VARIABLES[@]}"
+  UPLOAD_KEY=yes
+}
+
+warn_debug_signed() {
+  cat >&2 << EOF
+
+  ########################################################################
+  #  NOT FOR UPLOAD. No upload key is set, so this bundle is signed with  #
+  #  the debug key, and Google Play refuses it. Set the upload key in     #
+  #  .dev-data/signing.env as docs/release.md says, and build again.      #
+  ########################################################################
+
+EOF
+}
+
+# Google Play refuses a versionCode it has seen, so each bundle signed for upload needs a higher
+# versionCode than the last one.
+bundle() {
+  local reuse=$1 version_code version_name last_code output
+  load_upload_key
+  prebuild
+  version_code=$(sed -nE 's/^ *versionCode ([0-9]+)$/\1/p' "$ROOT/android/app/build.gradle")
+  version_name=$(sed -nE 's/^ *versionName "([^"]+)"$/\1/p' "$ROOT/android/app/build.gradle")
+  last_code=$(cat "$LAST_VERSION_CODE" 2> /dev/null || echo 0)
+  if [ "$version_code" -le "$last_code" ] && [ "$reuse" != --reuse-version-code ]; then
+    echo "versionCode $version_code is not higher than $last_code, the last one built for upload." >&2
+    echo "Raise android.versionCode in app.config.ts, or run dev/android.sh bundle --reuse-version-code." >&2
+    return 1
+  fi
+
+  cd "$ROOT/android"
+  ./gradlew bundleRelease \
+    -Pandroid.builder.sdkDownload=false \
+    --console=plain > "$LOGS/gradle-bundle.log" 2>&1 || {
+    echo "the Gradle build failed, see $LOGS/gradle-bundle.log" >&2
+    grep -A 6 'What went wrong' "$LOGS/gradle-bundle.log" >&2
+    return 1
+  }
+
+  mkdir -p "$BUNDLES"
+  if [ "$UPLOAD_KEY" = yes ]; then
+    output=$BUNDLES/waraq-$version_name-$version_code.aab
+  else
+    output=$BUNDLES/waraq-$version_name-$version_code-debug-signed.aab
+  fi
+  cp "$AAB" "$output"
+  echo "$output, $(($(wc -c < "$output") / 1000000)) MB"
+  "$JAVA_HOME/bin/keytool" -printcert -jarfile "$output" 2> /dev/null | grep -m 1 '^Owner:' | sed 's/^Owner:/signed by/'
+  echo
+  "$ROOT/dev/release-check.sh" "$output"
+
+  if [ "$UPLOAD_KEY" = no ]; then
+    warn_debug_signed
+  elif [ "$version_code" -gt "$last_code" ]; then
+    echo "$version_code" > "$LAST_VERSION_CODE"
+  fi
+}
+
+install_bundle() {
+  local aab=$1 spec=$DATA/tmp/emulator-device.json apks=$DATA/tmp/emulator.apks
+  if [ -z "$aab" ]; then
+    aab=$(ls -t "$BUNDLES"/*.aab | head -1)
+  fi
+  cat > "$spec" << EOF
+{
+  "supportedAbis": ["$(adb shell getprop ro.product.cpu.abilist | tr -d '\r' | sed 's/,/", "/g')"],
+  "supportedLocales": ["en-US"],
+  "screenDensity": $(adb shell wm density | sed -nE 's/^Physical density: ([0-9]+).*/\1/p'),
+  "sdkVersion": $(adb shell getprop ro.build.version.sdk | tr -d '\r')
+}
+EOF
+  # Google Play signs these APKs with its own key. Here the debug key stands in for it.
+  "$ROOT/dev/bundletool.sh" build-apks --bundle="$aab" --output="$apks" --overwrite \
+    --device-spec="$spec" --aapt2="$BUILD_TOOLS/aapt2" \
+    --ks="$ROOT/android/app/debug.keystore" --ks-pass=pass:android \
+    --ks-key-alias=androiddebugkey --key-pass=pass:android > "$LOGS/build-apks.log" 2>&1 || {
+    cat "$LOGS/build-apks.log" >&2
+    return 1
+  }
+  rm -rf "$DATA/tmp/emulator-apks"
+  unzip -q "$apks" 'splits/*' -d "$DATA/tmp/emulator-apks"
+  echo "installing $aab as $(cd "$DATA/tmp/emulator-apks/splits" && ls | tr '\n' ' ')"
+  adb install-multiple -r "$DATA"/tmp/emulator-apks/splits/*.apk
 }
 
 badging() {
@@ -906,6 +1028,13 @@ stop() {
 case "${1:-}" in
   build | badging | claim | release)
     "$1"
+    ;;
+  bundle)
+    bundle "${2:-}"
+    ;;
+  install-bundle)
+    require_claim
+    install_bundle "${2:-}"
     ;;
   boot | install | flow | scan | upload | logs | stop)
     require_claim
