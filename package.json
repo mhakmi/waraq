@@ -7,7 +7,8 @@
     "android": "expo run:android",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "test:integration": "vitest run --config vitest.integration.config.mts"
+    "test:integration": "vitest run --config vitest.integration.config.mts",
+    "licenses": "bun dev/licenses.ts"
   },
   "dependencies": {
     "@react-native-community/datetimepicker": "9.2.1",
