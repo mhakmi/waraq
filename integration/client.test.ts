@@ -163,7 +163,7 @@ describe('editing', () => {
   let document: DocumentId;
 
   beforeAll(async () => {
-    const created = await client.createTag(uniqueName('inbox'));
+    const created = await client.createLabel('tags', { name: uniqueName('inbox') });
     if (!created.ok) {
       throw new Error(JSON.stringify(created.error));
     }
@@ -202,7 +202,7 @@ describe('editing', () => {
 
   test('a new correspondent can be made by name', async () => {
     const name = uniqueName('made');
-    const result = await client.createCorrespondent(name);
+    const result = await client.createLabel('correspondents', { name });
     expect(result.ok && result.value.name).toBe(name);
   });
 

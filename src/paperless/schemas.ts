@@ -152,7 +152,7 @@ export const Tag = z
     text_color: z.string(),
     is_inbox_tag: z.boolean(),
     parent: z.number().int().nullable(),
-    // The answer to creating a tag or a correspondent leaves the count out.
+    // The answer to creating a label leaves the count out.
     document_count: z.number().int().default(0),
   })
   .transform((tag) => ({
@@ -180,7 +180,7 @@ export const Correspondent = z
 export type Correspondent = z.infer<typeof Correspondent>;
 
 export const DocumentType = z
-  .object({ id: z.number().int(), name: z.string(), document_count: z.number().int() })
+  .object({ id: z.number().int(), name: z.string(), document_count: z.number().int().default(0) })
   .transform((documentType) => ({
     id: documentType.id,
     name: documentType.name,
@@ -189,7 +189,7 @@ export const DocumentType = z
 export type DocumentType = z.infer<typeof DocumentType>;
 
 export const StoragePath = z
-  .object({ id: z.number().int(), name: z.string(), path: z.string(), document_count: z.number().int() })
+  .object({ id: z.number().int(), name: z.string(), path: z.string(), document_count: z.number().int().default(0) })
   .transform((storagePath) => ({
     id: storagePath.id,
     name: storagePath.name,
@@ -198,7 +198,7 @@ export const StoragePath = z
   }));
 export type StoragePath = z.infer<typeof StoragePath>;
 
-const customFieldDataTypes = [
+export const customFieldDataTypes = [
   'string',
   'url',
   'date',
@@ -210,6 +210,7 @@ const customFieldDataTypes = [
   'select',
   'longtext',
 ] as const;
+export type CustomFieldDataType = (typeof customFieldDataTypes)[number];
 
 export const CustomField = z
   .object({
@@ -225,7 +226,7 @@ export const CustomField = z
         default_currency: z.string().nullable().optional(),
       })
       .nullable(),
-    document_count: z.number().int(),
+    document_count: z.number().int().default(0),
   })
   .transform((field) => ({
     id: field.id,

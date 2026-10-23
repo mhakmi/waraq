@@ -54,7 +54,7 @@ export function useCreateLabel() {
   const [failed, setFailed] = useState(false);
 
   async function create(kind: 'tags' | 'correspondents', name: string): Promise<Named | null> {
-    const result = kind === 'tags' ? await client.createTag(name) : await client.createCorrespondent(name);
+    const result = await client.createLabel(kind, { name });
     if (!result.ok) {
       setFailed(true);
       return null;

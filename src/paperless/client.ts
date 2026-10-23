@@ -5,6 +5,7 @@ import {
   ChangedDocument,
   Correspondent,
   CustomField,
+  type CustomFieldDataType,
   type CustomFieldValue,
   DocumentDetail,
   DocumentId,
@@ -102,6 +103,36 @@ export type DocumentChanges = {
   tagIds?: number[];
   archiveSerialNumber?: number | null;
 };
+
+export type LabelKind = 'tags' | 'correspondents' | 'documentTypes' | 'storagePaths' | 'customFields';
+
+const labelEndpoints = {
+  tags: { path: 'tags/', item: Tag },
+  correspondents: { path: 'correspondents/', item: Correspondent },
+  documentTypes: { path: 'document_types/', item: DocumentType },
+  storagePaths: { path: 'storage_paths/', item: StoragePath },
+  customFields: { path: 'custom_fields/', item: CustomField },
+};
+
+export type LabelChanges = {
+  name?: string;
+  color?: string;
+  isInboxTag?: boolean;
+  path?: string;
+  dataType?: CustomFieldDataType;
+  selectOptions?: { id?: string; label: string }[];
+};
+
+function wireLabel(changes: LabelChanges): Record<string, unknown> {
+  return {
+    name: changes.name,
+    color: changes.color,
+    is_inbox_tag: changes.isInboxTag,
+    path: changes.path,
+    data_type: changes.dataType,
+    extra_data: changes.selectOptions === undefined ? undefined : { select_options: changes.selectOptions },
+  };
+}
 
 export type FileRequest = { url: string; headers: Record<string, string> };
 
@@ -476,10 +507,19 @@ export function createPaperlessClient<File>(options: ClientOptions<File>) {
     listCustomFields: () => listAll(connection, 'custom_fields/', CustomField),
     listSavedViews: () => listAll(connection, 'saved_views/', SavedView),
 
-    createTag: (name: string) =>
-      requestJson(connection, 'tags/', Tag, { method: 'POST', body: JSON.stringify({ name }) }),
-    createCorrespondent: (name: string) =>
-      requestJson(connection, 'correspondents/', Correspondent, { method: 'POST', body: JSON.stringify({ name }) }),
+    createLabel(kind: LabelKind, changes: LabelChanges) {
+      const { path, item } = labelEndpoints[kind];
+      return requestJson(connection, path, item, { method: 'POST', body: JSON.stringify(wireLabel(changes)) });
+    },
+
+    updateLabel(kind: LabelKind, id: number, changes: LabelChanges) {
+      const { path, item } = labelEndpoints[kind];
+      return requestJson(connection, `${path}${id}/`, item, { method: 'PATCH', body: JSON.stringify(wireLabel(changes)) });
+    },
+
+    deleteLabel(kind: LabelKind, id: number) {
+      return requestJson(connection, `${labelEndpoints[kind].path}${id}/`, z.null(), { method: 'DELETE' });
+    },
 
     postDocument(fields: UploadFields, file: File, filename: string): Promise<Result<TaskId>> {
       const form = formFromFields(fields);
