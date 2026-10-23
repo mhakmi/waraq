@@ -76,6 +76,8 @@ dev/android.sh boot
 dev/android.sh install-bundle  # the newest bundle's APKs for this emulator, as Google Play would send them
 dev/android.sh install
 dev/android.sh shot inbox  # .dev-data/shots/inbox.png
+dev/android.sh check inbox # every control on the screen: its label, and whether it is at least 48 by 48 dp
+dev/android.sh speak inbox # turns on TalkBack, moves through the controls with Tab, and saves what TalkBack says
 dev/android.sh flow        # the documents flow against http://10.0.2.2:8010, described below
 dev/android.sh upload      # the upload flow against the same server, described below
 dev/android.sh scan        # the scan flow, described below
@@ -88,6 +90,8 @@ dev/android.sh stop        # this emulator and its adb server only
 dev/android.sh claim       # take the emulator for this checkout
 dev/android.sh release     # stop it and give it up
 ```
+
+`check` reads the screen with `uiautomator dump` and runs `dev/screen-check.ts` on it. The dump does not show a control's role, so `speak` reads TalkBack's log for it, as in "Sign in. Button". TalkBack writes what it says to the log only after you turn on its verbose logging once on the emulator: TalkBack settings, Advanced settings, Developer settings, Log output level, VERBOSE.
 
 [docs/release.md](docs/release.md) describes the release build: the upload key, the version numbers, the release check, and what Google Play's Data safety form needs.
 
