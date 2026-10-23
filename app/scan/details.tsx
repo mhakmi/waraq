@@ -363,8 +363,10 @@ function Row({ label, first = false, onPress, accessibilityValue, trailing, chil
         onPress={onPress}
         style={({ pressed }) => [styles.rowPress, pressed && { backgroundColor: colors.surfaceSunken }]}
       >
-        <Text style={[styles.rowLabel, { color: colors.inkMuted }]}>{label}</Text>
-        <View style={styles.rowValue}>{children}</View>
+        <View style={styles.rowText}>
+          <Text style={[styles.rowLabel, { color: colors.inkMuted }]}>{label}</Text>
+          <View style={styles.rowValue}>{children}</View>
+        </View>
         {trailing === undefined && <Icon name="chevronEnd" color={colors.inkMuted} size={18} />}
       </Pressable>
       {trailing}
@@ -518,12 +520,12 @@ const styles = StyleSheet.create({
     minHeight: 56,
     flexDirection: 'row',
     alignItems: 'center',
-    flexWrap: 'wrap',
     gap: 12,
     paddingBlock: 8,
     paddingInlineStart: 16,
     paddingInlineEnd: 12,
   },
+  rowText: { flex: 1, flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 12 },
   rowLabel: { minWidth: 120, fontSize: 14 },
   rowValue: { flex: 1, minWidth: 140, gap: 2 },
   value: { fontSize: 15.5 },

@@ -174,16 +174,18 @@ function DocumentCard({ document, number, small, onEdit, onDiscard }: DocumentCa
             {document.kind === 'pdf' ? `${copy.scan.pdf} · ${count}` : count}
           </Text>
         </View>
-        {document.kind === 'pages' && (
-          <Button
-            label={copy.scan.editPages}
-            accessibilityLabel={copy.scan.editPagesOf(number)}
-            variant="text"
-            compact
-            onPress={onEdit}
-          />
-        )}
-        <IconButton icon="trash" label={copy.scan.discardDocument(number)} onPress={onDiscard} color={colors.inkMuted} />
+        <View style={styles.cardActions}>
+          {document.kind === 'pages' && (
+            <Button
+              label={copy.scan.editPages}
+              accessibilityLabel={copy.scan.editPagesOf(number)}
+              variant="text"
+              compact
+              onPress={onEdit}
+            />
+          )}
+          <IconButton icon="trash" label={copy.scan.discardDocument(number)} onPress={onDiscard} color={colors.inkMuted} />
+        </View>
       </View>
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.strip}>
         {document.kind === 'pages' ? (
@@ -214,9 +216,10 @@ const styles = StyleSheet.create({
   emptyTitle: { fontSize: 20, fontWeight: '500' },
   lead: { fontSize: 16 },
   card: { paddingBlockStart: 6, paddingBlockEnd: 16, paddingInline: 16, borderRadius: radius, borderWidth: 1, gap: 8 },
-  cardHead: { minHeight: 48, flexDirection: 'row', alignItems: 'center', columnGap: 8 },
+  cardHead: { minHeight: 48, flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', columnGap: 8 },
+  cardActions: { flexDirection: 'row', alignItems: 'center', columnGap: 8, marginInlineStart: 'auto' },
   documentName: { fontSize: 16, fontWeight: '600' },
-  names: { flex: 1, minWidth: 0, flexDirection: 'row', flexWrap: 'wrap', alignItems: 'baseline', columnGap: 8 },
+  names: { flexGrow: 1, flexBasis: 160, flexDirection: 'row', flexWrap: 'wrap', alignItems: 'baseline', columnGap: 8 },
   meta: { fontSize: 13.5 },
   strip: { gap: 10 },
   problem: { fontSize: 14.5 },
