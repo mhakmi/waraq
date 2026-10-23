@@ -10,9 +10,11 @@ import {
   DocumentDetail,
   DocumentId,
   DocumentIdOnly,
+  DocumentPermissions,
   DocumentSummary,
   documentSummaryFields,
   DocumentType,
+  Group,
   type IsoDate,
   NotesResponse,
   pageOf,
@@ -23,6 +25,7 @@ import {
   TokenErrorBody,
   TokenResponse,
   UiSettings,
+  User,
 } from './schemas';
 import { LenientTask, Task, taskStatus, type TaskStatus } from './tasks';
 import type { ServerUrl } from './url';
@@ -501,6 +504,23 @@ export function createPaperlessClient<File>(options: ClientOptions<File>) {
       });
       return notesResult(result);
     },
+
+    async deleteNote(id: DocumentId, noteId: number) {
+      const result = await requestJson(connection, `documents/${id}/notes/`, NotesResponse, {
+        method: 'DELETE',
+        query: { id: noteId },
+      });
+      return notesResult(result);
+    },
+
+    getDocumentPermissions(id: DocumentId) {
+      return requestJson(connection, `documents/${id}/`, DocumentPermissions, {
+        query: { full_perms: true, fields: 'owner,permissions' },
+      });
+    },
+
+    listUsers: () => listAll(connection, 'users/', User),
+    listGroups: () => listAll(connection, 'groups/', Group),
 
     listTags: () => listAll(connection, 'tags/', Tag),
     listCorrespondents: () => listAll(connection, 'correspondents/', Correspondent),

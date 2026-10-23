@@ -129,13 +129,18 @@ export const Note = z
     id: z.number().int(),
     note: z.string(),
     created: z.string(),
-    user: z.object({ id: z.number().int(), username: z.string() }),
+    user: z.object({
+      id: z.number().int(),
+      username: z.string(),
+      first_name: z.string().default(''),
+      last_name: z.string().default(''),
+    }),
   })
   .transform((note) => ({
     id: note.id,
     text: note.note,
     created: note.created,
-    user: note.user,
+    user: { id: note.user.id, username: note.user.username, fullName: `${note.user.first_name} ${note.user.last_name}`.trim() },
   }));
 export type Note = z.infer<typeof Note>;
 
@@ -256,3 +261,25 @@ export const SavedView = z
     pageSize: view.page_size,
   }));
 export type SavedView = z.infer<typeof SavedView>;
+
+const PeopleWithPermission = z.object({ users: z.array(z.number().int()), groups: z.array(z.number().int()) });
+
+export const DocumentPermissions = z
+  .object({
+    owner: z.number().int().nullable(),
+    permissions: z.object({ view: PeopleWithPermission, change: PeopleWithPermission }),
+  })
+  .transform((document) => ({
+    ownerId: document.owner,
+    view: document.permissions.view,
+    change: document.permissions.change,
+  }));
+export type DocumentPermissions = z.infer<typeof DocumentPermissions>;
+
+export const User = z
+  .object({ id: z.number().int(), username: z.string(), first_name: z.string().default(''), last_name: z.string().default('') })
+  .transform((user) => ({ id: user.id, username: user.username, fullName: `${user.first_name} ${user.last_name}`.trim() }));
+export type User = z.infer<typeof User>;
+
+export const Group = z.object({ id: z.number().int(), name: z.string() });
+export type Group = z.infer<typeof Group>;

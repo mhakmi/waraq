@@ -12,6 +12,8 @@ export const queryKeys = {
   allDocumentDetails: (accountId: string) => [accountId, 'document'] as const,
   document: (accountId: string, id: number) => [accountId, 'document', id] as const,
   notes: (accountId: string, id: number) => [accountId, 'notes', id] as const,
+  documentPermissions: (accountId: string, id: number) => [accountId, 'documentPermissions', id] as const,
+  people: (accountId: string, kind: 'users' | 'groups') => [accountId, 'people', kind] as const,
   autocomplete: (accountId: string, term: string) => [accountId, 'autocomplete', term] as const,
   uiSettings: (accountId: string) => [accountId, 'uiSettings'] as const,
 };

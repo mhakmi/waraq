@@ -221,6 +221,29 @@ describe('editing', () => {
     expect(added.ok && added.value.map((note) => note.text)).toEqual(['Pay before October 19.']);
   });
 
+  test('a note can be deleted, and the list that comes back leaves it out', async () => {
+    const added = await client.addNote(document, 'Delete me.');
+    const note = added.ok ? added.value.find((item) => item.text === 'Delete me.') : undefined;
+    if (note === undefined) {
+      throw new Error(JSON.stringify(added));
+    }
+    expect(note.user.username).toBe('admin');
+    const result = await client.deleteNote(document, note.id);
+    expect(result.ok && result.value.map((item) => item.id)).not.toContain(note.id);
+  });
+
+  test('permissions name the owner, and users and groups can be listed by an admin', async () => {
+    const permissions = await client.getDocumentPermissions(document);
+    const users = await client.listUsers();
+    const groups = await client.listGroups();
+    if (!permissions.ok || !users.ok || !groups.ok) {
+      throw new Error(JSON.stringify([permissions, users, groups]));
+    }
+    const owner = users.value.find((user) => user.id === permissions.value.ownerId);
+    expect(owner?.username).toBe('admin');
+    expect(permissions.value.view).toEqual({ users: expect.any(Array), groups: expect.any(Array) });
+  });
+
   test('delete removes the document', async () => {
     const doomed = await uploadAndWait(`${marker} doomed`, [], '2026-02-02' as IsoDate);
     const result = await client.deleteDocument(doomed);
