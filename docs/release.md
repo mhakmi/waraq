@@ -11,7 +11,7 @@ flowchart LR
   config["app.config.ts<br/>versionName, versionCode"] --> prebuild["expo prebuild<br/>plugins/release-build.ts"]
   key[".dev-data/signing.env<br/>upload key"] --> gradle
   prebuild --> gradle["Gradle bundleRelease<br/>R8, resource shrinking"]
-  gradle --> aab["waraq-0.2.0-2.aab<br/>in .dev-data/bundles/"]
+  gradle --> aab["waraq-0.3.0-3.aab<br/>in .dev-data/bundles/"]
   aab --> check["dev/release-check.sh"]
   check -- passes --> record[".dev-data/last-version-code"]
   aab --> emulator["install-bundle<br/>flow and upload on the emulator"]

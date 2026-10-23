@@ -6,12 +6,12 @@ const config: ExpoConfig = {
   name: brand.displayName,
   slug: brand.slug,
   scheme: brand.slug,
-  version: '0.2.0',
+  version: '0.3.0',
   orientation: 'portrait',
   userInterfaceStyle: 'automatic',
   android: {
     package: brand.androidPackage,
-    versionCode: 2,
+    versionCode: 3,
     allowBackup: false,
     blockedPermissions: [
       'android.permission.READ_EXTERNAL_STORAGE',
