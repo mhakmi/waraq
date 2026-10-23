@@ -1,8 +1,6 @@
 import type { QueryKey } from '@tanstack/react-query';
 
-import type { DocumentQuery } from '../paperless/client';
-
-export type LabelKind = 'tags' | 'correspondents' | 'documentTypes' | 'storagePaths' | 'customFields';
+import type { DocumentQuery, LabelKind } from '../paperless/client';
 
 export const queryKeys = {
   labels: (accountId: string, kind: LabelKind) => [accountId, 'labels', kind] as const,
@@ -14,6 +12,7 @@ export const queryKeys = {
   document: (accountId: string, id: number) => [accountId, 'document', id] as const,
   notes: (accountId: string, id: number) => [accountId, 'notes', id] as const,
   autocomplete: (accountId: string, term: string) => [accountId, 'autocomplete', term] as const,
+  uiSettings: (accountId: string) => [accountId, 'uiSettings'] as const,
 };
 
 function isFullTextList(key: QueryKey): boolean {
@@ -27,6 +26,7 @@ export function shouldPersist(key: QueryKey): boolean {
     case 'savedViews':
     case 'document':
     case 'notes':
+    case 'uiSettings':
       return true;
     case 'documents':
       return (key[2] === 'inbox' || key[2] === 'list') && !isFullTextList(key);

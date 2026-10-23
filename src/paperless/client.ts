@@ -521,6 +521,8 @@ export function createPaperlessClient<File>(options: ClientOptions<File>) {
       return requestJson(connection, `${labelEndpoints[kind].path}${id}/`, z.null(), { method: 'DELETE' });
     },
 
+    readUiSettings: () => requestJson(connection, 'ui_settings/', UiSettings),
+
     postDocument(fields: UploadFields, file: File, filename: string): Promise<Result<TaskId>> {
       const form = formFromFields(fields);
       options.appendFile(form, 'document', file, filename);

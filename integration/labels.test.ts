@@ -1,7 +1,8 @@
-import { describe, expect, test } from 'vitest';
+import { afterAll, beforeAll, describe, expect, test } from 'vitest';
 
-import type { LabelKind } from '../src/paperless/client';
-import { client, uniqueName } from './helpers';
+import { type LabelKind, obtainToken } from '../src/paperless/client';
+import { accountAccess } from '../src/settings/permissions';
+import { client, clientWithToken, serverUrl, token, uniqueName } from './helpers';
 
 async function listOf(kind: LabelKind) {
   const lists = {
@@ -90,5 +91,56 @@ describe('labels of every kind', () => {
     if (first.ok) {
       await client.deleteLabel('tags', first.value.id);
     }
+  });
+});
+
+describe('an account that may only look', () => {
+  const username = uniqueName('labels-viewer');
+  const password = `${uniqueName('pw')}-Aa1!`;
+  let userId: number;
+  let viewer: ReturnType<typeof clientWithToken>;
+
+  beforeAll(async () => {
+    const response = await fetch(`${serverUrl}/api/users/`, {
+      method: 'POST',
+      headers: { Authorization: `Token ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username, password, user_permissions: ['view_uisettings', 'view_document', 'view_tag'] }),
+    });
+    if (!response.ok) {
+      throw new Error(`Could not create ${username}: ${response.status} ${await response.text()}`);
+    }
+    userId = ((await response.json()) as { id: number }).id;
+    const viewerToken = await obtainToken({ baseUrl: serverUrl, fetch }, { username, password });
+    if (!viewerToken.ok) {
+      throw new Error(JSON.stringify(viewerToken.error));
+    }
+    viewer = clientWithToken(viewerToken.value);
+  });
+
+  afterAll(async () => {
+    await fetch(`${serverUrl}/api/users/${userId}/`, { method: 'DELETE', headers: { Authorization: `Token ${token}` } });
+  });
+
+  test('reads its own permissions from ui_settings', async () => {
+    const settings = await viewer.readUiSettings();
+    if (!settings.ok) {
+      throw new Error(JSON.stringify(settings.error));
+    }
+    expect(settings.value.user.username).toBe(username);
+    const byArea = Object.fromEntries(accountAccess(new Set(settings.value.permissions)).areas.map((entry) => [entry.area, entry.allowed]));
+    expect(byArea.tags).toEqual(['view']);
+    expect(byArea.documents).toEqual(['view']);
+    expect(byArea.correspondents).toEqual([]);
+  });
+
+  test('is refused a new tag, a delete, and the correspondents', async () => {
+    const tag = await client.createLabel('tags', { name: uniqueName('labels-kept') });
+    if (!tag.ok) {
+      throw new Error(JSON.stringify(tag.error));
+    }
+    expect(await viewer.createLabel('tags', { name: uniqueName('labels-refused') })).toEqual({ ok: false, error: { kind: 'forbidden' } });
+    expect(await viewer.deleteLabel('tags', tag.value.id)).toEqual({ ok: false, error: { kind: 'forbidden' } });
+    expect(await viewer.listCorrespondents()).toEqual({ ok: false, error: { kind: 'forbidden' } });
+    await client.deleteLabel('tags', tag.value.id);
   });
 });

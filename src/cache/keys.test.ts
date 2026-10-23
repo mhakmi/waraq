@@ -10,6 +10,7 @@ describe('shouldPersist', () => {
     [queryKeys.documentList('a', { tagIdsAll: [2] }), true],
     [queryKeys.document('a', 2), true],
     [queryKeys.notes('a', 2), true],
+    [queryKeys.uiSettings('a'), true],
     [queryKeys.documentList('a', { query: 'hydro' }), false],
     [queryKeys.documentCount('a', { tagIdsAll: [2] }), false],
     [queryKeys.autocomplete('a', 'hyd'), false],
