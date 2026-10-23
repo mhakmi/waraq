@@ -11,7 +11,7 @@ export const copy = {
     uploads: 'Uploads',
     scan: 'Scan',
     back: 'Back',
-    account: 'Account',
+    account: 'Account and settings',
   },
 
   account: {
@@ -363,6 +363,114 @@ export const copy = {
     heading: 'Something went wrong',
     lead: `${brand.displayName} hit a problem it did not expect. Your documents on the server are not affected.`,
     tryAgain: 'Try again',
+  },
+
+  settings: {
+    title: 'Settings',
+    serverVersion: (version: string) => `Paperless-ngx ${version}`,
+    signOut: 'Sign out',
+    appearance: 'Appearance',
+    theme: 'Theme',
+    themes: { system: 'System', light: 'Light', dark: 'Dark' },
+    labels: 'Labels',
+    other: 'Other',
+    permissions: 'What your account can do',
+    crashReport: 'Send a crash report',
+    licenses: 'Open-source licenses',
+    about: 'About',
+    aboutText: (version: string) =>
+      `${brand.displayName} ${version}. ${brand.displayName} is an independent client for Paperless-ngx. It is not made by or affiliated with the Paperless-ngx project.`,
+  },
+
+  labels: {
+    kinds: {
+      tags: { title: 'Tags', one: 'tag', plural: 'tags', create: 'New tag' },
+      correspondents: { title: 'Correspondents', one: 'correspondent', plural: 'correspondents', create: 'New correspondent' },
+      documentTypes: { title: 'Document types', one: 'document type', plural: 'document types', create: 'New document type' },
+      storagePaths: { title: 'Storage paths', one: 'storage path', plural: 'storage paths', create: 'New storage path' },
+      customFields: { title: 'Custom fields', one: 'custom field', plural: 'custom fields', create: 'New custom field' },
+    },
+    search: 'Search',
+    clearSearch: 'Clear search',
+    documentCount: (count: number) => (count === 1 ? '1 document' : `${count} documents`),
+    inboxTag: 'Inbox tag',
+    nothingYet: (plural: string) => `No ${plural} yet`,
+    nothingYetLead: 'Make one with the plus button.',
+    nothingMatches: 'Nothing matches.',
+    unknownKind: 'This kind of label does not exist.',
+    errorTitle: (plural: string) => `The ${plural} could not load`,
+    offlineTitle: 'You are offline',
+    offlineLead: 'The list loads when your phone is back online.',
+    tryAgain: 'Try again',
+    notAllowedToSee: (plural: string) => `Your account may not see ${plural}. Ask the server admin.`,
+
+    name: 'Name',
+    color: 'Color',
+    colorNames: [
+      'Light blue',
+      'Blue',
+      'Light green',
+      'Green',
+      'Pink',
+      'Red',
+      'Light orange',
+      'Orange',
+      'Lavender',
+      'Purple',
+      'Brown',
+      'Black',
+    ],
+    currentColor: 'The color it has now',
+    inboxSwitch: 'Inbox tag',
+    inboxHelp: 'Paperless-ngx gives this tag to every new document, and those documents show in the inbox.',
+    path: 'Path template',
+    pathHelp: 'Paperless-ngx files the documents in this folder, for example {{ correspondent }}/{{ created_year }}/{{ title }}.',
+    fieldType: 'Type',
+    fieldTypeFixed: 'The type cannot change after the field is made.',
+    fieldTypes: {
+      string: 'Text',
+      url: 'Link',
+      date: 'Date',
+      boolean: 'Yes or no',
+      integer: 'Whole number',
+      float: 'Number',
+      monetary: 'Amount of money',
+      documentlink: 'Link to other documents',
+      select: 'Choice from a list',
+      longtext: 'Long text',
+      unsupported: 'A type this app does not know',
+    },
+    choices: 'Choices',
+    choice: (number: number) => `Choice ${number}`,
+    addChoice: 'Add a choice',
+    removeChoice: (number: number) => `Remove choice ${number}`,
+    choicesFixed: 'The choices are set when the field is made. Change them in Paperless-ngx.',
+    save: 'Save',
+    create: 'Create',
+    delete: 'Delete',
+    cancel: 'Cancel',
+    edit: (name: string) => `Edit ${name}`,
+    deleteTitle: (one: string, name: string) => `Delete the ${one} ${name}?`,
+    deleteMessage: (count: number) =>
+      count === 0
+        ? 'No document uses it.'
+        : count === 1
+          ? '1 document uses it. The document stays on your server.'
+          : `${count} documents use it. They stay on your server.`,
+    problems: {
+      nameMissing: 'Enter a name.',
+      pathMissing: 'Enter a path template.',
+      optionsMissing: 'Enter at least one choice.',
+    },
+    forbidden: {
+      add: (plural: string) => `Your account may not add ${plural}. Ask the server admin to give it the Add permission for ${plural}.`,
+      change: (plural: string) =>
+        `Your account may not change ${plural}. Ask the server admin to give it the Change permission for ${plural}.`,
+      delete: (plural: string) =>
+        `Your account may not delete ${plural}. Ask the server admin to give it the Delete permission for ${plural}.`,
+    },
+    rejected: (detail: string) => `Your server did not take it: ${detail}`,
+    failed: 'Your server could not be reached. Check your connection, then try again.',
   },
 
   signIn: {

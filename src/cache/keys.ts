@@ -9,6 +9,7 @@ export const queryKeys = {
   inbox: (accountId: string, tagIds: number[]) => [accountId, 'documents', 'inbox', tagIds] as const,
   documentList: (accountId: string, query: DocumentQuery) => [accountId, 'documents', 'list', query] as const,
   documentCount: (accountId: string, query: DocumentQuery) => [accountId, 'documents', 'count', query] as const,
+  allDocumentDetails: (accountId: string) => [accountId, 'document'] as const,
   document: (accountId: string, id: number) => [accountId, 'document', id] as const,
   notes: (accountId: string, id: number) => [accountId, 'notes', id] as const,
   autocomplete: (accountId: string, term: string) => [accountId, 'autocomplete', term] as const,

@@ -1,29 +1,16 @@
-import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
+import { useRouter } from 'expo-router';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { copy } from '../copy';
-import { useSession, useSignedIn } from '../session';
-import { hostOf } from '../signin/connect';
+import { useSignedIn } from '../session';
 import { touchTarget, useColors } from '../theme';
-import { useUploadQueue } from '../upload/queue';
-import { unfinishedCount } from '../upload/rows';
 
 export function AccountButton() {
   const colors = useColors();
+  const router = useRouter();
   const { account } = useSignedIn();
-  const session = useSession();
-  const unfinished = unfinishedCount(useUploadQueue().jobs, account.id);
-
-  function askToSignOut() {
-    const message = copy.account.signOutMessage(account.username, hostOf(account.serverUrl));
-    const uploads = unfinished === 0 ? '' : ` ${copy.account.signOutWithUploads(unfinished)}`;
-    Alert.alert(copy.account.signOutTitle, message + uploads, [
-      { text: copy.account.cancel, style: 'cancel' },
-      { text: copy.account.signOut, style: 'destructive', onPress: () => session.signOut() },
-    ]);
-  }
-
   return (
-    <Pressable accessibilityRole="button" accessibilityLabel={copy.shell.account} onPress={askToSignOut} style={styles.button}>
+    <Pressable accessibilityRole="button" accessibilityLabel={copy.shell.account} onPress={() => router.push('/settings')} style={styles.button}>
       <View style={[styles.avatar, { backgroundColor: colors.accent }]}>
         <Text style={[styles.initial, { color: colors.onAccent }]}>{account.username.slice(0, 1).toUpperCase()}</Text>
       </View>

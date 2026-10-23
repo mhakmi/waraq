@@ -39,6 +39,8 @@ const shapes = {
   chevronStart: '<path d="m15 6-6 6 6 6"/>',
   chevronEnd: '<path d="m9 6 6 6-6 6"/>',
   files: '<path d="M8 3h7l4 4v11a1 1 0 0 1-1 1H8a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z"/><path d="M15 3v4h4M4 7v13a1 1 0 0 0 1 1h10"/>',
+  bug: '<rect x="7" y="8" width="10" height="12" rx="5"/><path d="M12 11v9M4 14h3M17 14h3M5 9l2.5 1.5M19 9l-2.5 1.5M9 5l1.5 2.5M15 5l-1.5 2.5"/>',
+  signOut: '<path d="M14 4h5v16h-5M10 8l4 4-4 4M14 12H3"/>',
   mark: '<path d="M7 3h8l4 4v12a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z"/><path d="M15 3v4h4M8.5 12h7M8.5 16h5"/>',
 };
 

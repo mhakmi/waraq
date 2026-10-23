@@ -82,6 +82,7 @@ export function useEditLabels(kind: LabelKind) {
   async function refresh() {
     await queryClient.invalidateQueries({ queryKey: queryKeys.labels(account.id, kind) });
     queryClient.invalidateQueries({ queryKey: queryKeys.allDocumentLists(account.id) });
+    queryClient.invalidateQueries({ queryKey: queryKeys.allDocumentDetails(account.id) });
   }
 
   const save = useMutation({

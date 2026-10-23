@@ -78,6 +78,7 @@ function Screens() {
         <Stack.Screen name="scan/details" />
         <Stack.Screen name="document/[id]/index" />
         <Stack.Screen name="document/[id]/edit" />
+        <Stack.Screen name="settings" />
       </Stack.Protected>
       <Stack.Protected guard={!signedIn}>
         <Stack.Screen name="sign-in" />
