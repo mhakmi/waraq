@@ -11,11 +11,13 @@ import { installCrashHandlers, rememberSecrets } from '../src/crash/record';
 import { ScreenError } from '../src/crash/ScreenError';
 import { connectQueriesToDevice, queryClient, savedForMs } from '../src/query';
 import { SessionProvider, useSession } from '../src/session';
+import { applySavedTheme } from '../src/settings/theme';
 import { useColors, useIsDark } from '../src/theme';
 import { registerUploadTask } from '../src/upload/background';
 import { connectUploadsToDevice, runUploads } from '../src/upload/queue';
 
 installCrashHandlers();
+applySavedTheme();
 
 const persistOptions = {
   persister: queryPersister,
