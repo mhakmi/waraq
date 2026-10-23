@@ -62,15 +62,40 @@ function chooseTitle(documentTitle: string | undefined, batchTitle: string | und
   return defaultTitle;
 }
 
-function mergeCustomFields(
-  batchFields: CustomFieldValue[] = [],
-  documentFields: CustomFieldValue[] = [],
-): CustomFieldValue[] {
-  const byField = new Map<number, CustomFieldValue>();
-  for (const field of [...batchFields, ...documentFields]) {
-    byField.set(field.fieldId, field);
+export type ResolvedCustomField = {
+  fieldId: number;
+  value: CustomFieldValue['value'];
+  fromBatch: boolean;
+};
+
+export function resolveCustomFields(batchFields: CustomFieldValue[] = [], documentFields: CustomFieldValue[] = []): ResolvedCustomField[] {
+  const resolved = batchFields.map((entry) => {
+    const own = documentFields.find((candidate) => candidate.fieldId === entry.fieldId);
+    return own === undefined ? { ...entry, fromBatch: true } : { ...own, fromBatch: false };
+  });
+  for (const own of documentFields) {
+    if (!batchFields.some((entry) => entry.fieldId === own.fieldId)) {
+      resolved.push({ ...own, fromBatch: false });
+    }
   }
-  return Array.from(byField.values());
+  return resolved;
+}
+
+function uploadCustomFields(batchFields: CustomFieldValue[] | undefined, documentFields: CustomFieldValue[] | undefined): CustomFieldValue[] {
+  return resolveCustomFields(batchFields, documentFields).flatMap((entry) =>
+    entry.value === null ? [] : [{ fieldId: entry.fieldId, value: entry.value }],
+  );
+}
+
+export function withCustomField(entries: CustomFieldValue[] = [], fieldId: number, value: CustomFieldValue['value']): CustomFieldValue[] {
+  const others = entries.filter((entry) => entry.fieldId !== fieldId);
+  const index = entries.findIndex((entry) => entry.fieldId === fieldId);
+  const position = index === -1 ? others.length : index;
+  return [...others.slice(0, position), { fieldId, value }, ...others.slice(position)];
+}
+
+export function withoutCustomField(entries: CustomFieldValue[] = [], fieldId: number): CustomFieldValue[] {
+  return entries.filter((entry) => entry.fieldId !== fieldId);
 }
 
 export function resolveUploadFields(batch: Batch, document: DraftDocument, defaultTitle: string): UploadFields {
@@ -84,7 +109,7 @@ export function resolveUploadFields(batch: Batch, document: DraftDocument, defau
     storagePathId: choose(own.storagePathId, shared.storagePathId),
     tagIds: Array.from(new Set([...(shared.tagIds ?? []), ...(own.tagIds ?? [])])),
     archiveSerialNumber: choose(own.archiveSerialNumber, shared.archiveSerialNumber),
-    customFields: mergeCustomFields(shared.customFields, own.customFields),
+    customFields: uploadCustomFields(shared.customFields, own.customFields),
   };
 }
 

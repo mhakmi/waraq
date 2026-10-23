@@ -3,6 +3,9 @@ import { describe, expect, test } from 'vitest';
 import type { IsoDate } from '../paperless/schemas';
 import { AccountId, BatchId, JobId } from '../upload/machine';
 import {
+  resolveCustomFields,
+  withCustomField,
+  withoutCustomField,
   addDocument,
   addPages,
   type Batch,
@@ -136,6 +139,11 @@ describe('resolveUploadFields', () => {
       { fieldId: 2, value: 20 },
       { fieldId: 3, value: true },
     ]);
+  });
+
+  test('None on the document leaves the batch custom field off', () => {
+    const fields = resolve({ customFields: [{ fieldId: 1, value: 'batch' }, { fieldId: 2, value: 10 }] }, { customFields: [{ fieldId: 1, value: null }] });
+    expect(fields.customFields).toEqual([{ fieldId: 2, value: 10 }]);
   });
 
   test('a document set back to the batch value takes the batch value again', () => {
@@ -300,4 +308,30 @@ describe('withoutQueuedDocuments', () => {
     expect(withoutQueuedDocuments(start, new Set([jobId(7)]))).toBe(start);
   });
 
+});
+
+describe('custom fields on a batch card', () => {
+  test('say which values come from the batch, with the batch fields first', () => {
+    expect(
+      resolveCustomFields(
+        [{ fieldId: 1, value: 'batch' }, { fieldId: 2, value: 10 }],
+        [{ fieldId: 3, value: true }, { fieldId: 2, value: null }],
+      ),
+    ).toEqual([
+      { fieldId: 1, value: 'batch', fromBatch: true },
+      { fieldId: 2, value: null, fromBatch: false },
+      { fieldId: 3, value: true, fromBatch: false },
+    ]);
+  });
+
+  test('setting a field keeps its place, and removing it lets the batch value show again', () => {
+    const entries = [{ fieldId: 1, value: 'a' }, { fieldId: 2, value: 'b' }];
+    expect(withCustomField(entries, 1, 'c')).toEqual([{ fieldId: 1, value: 'c' }, { fieldId: 2, value: 'b' }]);
+    expect(withCustomField(entries, 3, 'd')).toEqual([...entries, { fieldId: 3, value: 'd' }]);
+    const own = withoutCustomField(withCustomField(undefined, 2, 'mine'), 2);
+    expect(resolveCustomFields(entries, own)).toEqual([
+      { fieldId: 1, value: 'a', fromBatch: true },
+      { fieldId: 2, value: 'b', fromBatch: true },
+    ]);
+  });
 });
