@@ -4,16 +4,18 @@ import { StyleSheet, Switch, Text, type TextInputProps, View } from 'react-nativ
 
 import { queryKeys } from '../cache/keys';
 import { copy } from '../copy';
-import type { Draft, Problem, TextInput } from '../documents/customFields';
+import { type Draft, type Problem, type TextInput, type WireValue, writeDraft } from '../documents/customFields';
 import type { CustomField } from '../paperless/schemas';
 import { unwrap } from '../query';
 import { useClient, useSignedIn } from '../session';
 import { useColors } from '../theme';
+import { Button } from './Button';
 import { Chip } from './Chip';
 import { Field } from './Field';
 import { DateField, FieldBox, FieldLabel } from './FieldBox';
 import { IconButton } from './IconButton';
 import { Picker } from './Picker';
+import { Sheet } from './Sheet';
 
 type EditorProps<Shape extends Draft> = {
   field: CustomField;
@@ -243,4 +245,34 @@ const styles = StyleSheet.create({
   currency: { flexBasis: 110, flexGrow: 0 },
   amount: { flexBasis: 160, flexGrow: 1, minWidth: 0 },
   chips: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 8 },
+  sheetFoot: { flex: 1, flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'flex-end', gap: 10 },
 });
+
+type CustomFieldSheetProps = {
+  field: CustomField;
+  start: Draft;
+  clearLabel: string;
+  onSet: (value: WireValue) => void;
+  onClear: () => void;
+  onClose: () => void;
+};
+
+export function CustomFieldSheet({ field, start, clearLabel, onSet, onClear, onClose }: CustomFieldSheetProps) {
+  const [draft, setDraft] = useState(start);
+  const written = writeDraft(field, draft);
+  return (
+    <Sheet
+      visible
+      title={field.name}
+      onClose={onClose}
+      footer={
+        <View style={styles.sheetFoot}>
+          <Button label={clearLabel} variant="outline" onPress={onClear} />
+          <Button label={copy.customFields.save} disabled={!written.ok} onPress={() => written.ok && onSet(written.value)} />
+        </View>
+      }
+    >
+      <CustomFieldEditor field={field} draft={draft} onChange={setDraft} problem={written.ok ? null : written.problem} />
+    </Sheet>
+  );
+}

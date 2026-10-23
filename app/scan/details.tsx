@@ -4,12 +4,25 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { copy } from '../../src/copy';
+import { type Draft, readValue, showValue, type WireValue } from '../../src/documents/customFields';
 import { type Named, nameOf, useCreateLabel, useLabels } from '../../src/labels';
-import { type Batch, type DocumentMetadata, type DraftDocument, pageCount, setOwn, setShared } from '../../src/scan/batch';
+import type { CustomField } from '../../src/paperless/schemas';
+import {
+  type Batch,
+  type DocumentMetadata,
+  type DraftDocument,
+  pageCount,
+  resolveCustomFields,
+  setOwn,
+  setShared,
+  withCustomField,
+  withoutCustomField,
+} from '../../src/scan/batch';
 import { batchQueued, dropQueuedDocuments, updateBatch, useBatch } from '../../src/scan/store';
 import { useSignedIn } from '../../src/session';
 import { radius, touchTarget, useColors } from '../../src/theme';
 import { Button } from '../../src/ui/Button';
+import { CustomFieldSheet } from '../../src/ui/CustomFieldEditor';
 import { TagPill } from '../../src/ui/Chip';
 import { Field } from '../../src/ui/Field';
 import { Icon } from '../../src/ui/Icon';
@@ -23,6 +36,7 @@ type OneOf = 'correspondentId' | 'documentTypeId' | 'storagePathId';
 type FieldName = OneOf | 'tagIds';
 type Scope = { kind: 'shared' } | { kind: 'own'; documentId: JobId };
 type OpenPicker = { scope: Scope; field: FieldName } | null;
+type OpenCustomField = { scope: Scope; field: CustomField; start: Draft } | null;
 
 const oneOfFields: OneOf[] = ['correspondentId', 'documentTypeId', 'storagePathId'];
 
@@ -41,6 +55,8 @@ export default function BatchDetailsScreen() {
   const labels = useLabels();
   const createLabel = useCreateLabel();
   const [picker, setPicker] = useState<OpenPicker>(null);
+  const [addingTo, setAddingTo] = useState<Scope | null>(null);
+  const [customField, setCustomField] = useState<OpenCustomField>(null);
   const [uploading, setUploading] = useState(false);
   const [uploadFailed, setUploadFailed] = useState(false);
   const uploadStarted = useRef(false);
@@ -107,6 +123,44 @@ export default function BatchDetailsScreen() {
       uploadStarted.current = false;
       setUploadFailed(true);
       setUploading(false);
+    }
+  }
+
+  const customFields = labels.customFields.data ?? [];
+
+  function customFieldsOf(scope: Scope) {
+    return metadataOf(scope).customFields ?? [];
+  }
+
+  function setCustomFieldValue(scope: Scope, fieldId: number, value: WireValue) {
+    apply(scope, { customFields: withCustomField(customFieldsOf(scope), fieldId, value) });
+  }
+
+  function removeCustomField(scope: Scope, fieldId: number) {
+    apply(scope, { customFields: withoutCustomField(customFieldsOf(scope), fieldId) });
+  }
+
+  function customText(fieldId: number, value: WireValue): string {
+    const field = customFields.find((candidate) => candidate.id === fieldId);
+    return (field === undefined ? null : showValue(field, value, copy.locale, copy.detail.fieldWords)) ?? copy.scan.none;
+  }
+
+  function fieldsToAdd(scope: Scope): CustomField[] {
+    const present = new Set(
+      scope.kind === 'shared'
+        ? customFieldsOf(scope).map((entry) => entry.fieldId)
+        : resolveCustomFields(batch?.shared.customFields, customFieldsOf(scope)).map((entry) => entry.fieldId),
+    );
+    return customFields.filter((field) => !present.has(field.id) && readValue(field, null) !== null);
+  }
+
+  function openCustomField(scope: Scope, fieldId: number) {
+    const field = customFields.find((candidate) => candidate.id === fieldId);
+    const own = scope.kind === 'shared' ? [] : customFieldsOf(scope);
+    const value = resolveCustomFields(batch?.shared.customFields, own).find((entry) => entry.fieldId === fieldId)?.value ?? null;
+    const start = field === undefined ? null : (readValue(field, value) ?? readValue(field, null));
+    if (field !== undefined && start !== null) {
+      setCustomField({ scope, field, start });
     }
   }
 
@@ -180,6 +234,22 @@ export default function BatchDetailsScreen() {
               </Row>
             );
           })}
+          {(shared.customFields ?? []).map((entry) => {
+            const text = customText(entry.fieldId, entry.value);
+            return (
+              <Row
+                key={`custom-${entry.fieldId}`}
+                label={customFields.find((field) => field.id === entry.fieldId)?.name ?? String(entry.fieldId)}
+                onPress={() => openCustomField({ kind: 'shared' }, entry.fieldId)}
+                accessibilityValue={text}
+              >
+                <Text style={[styles.value, { color: colors.ink }]}>{text}</Text>
+              </Row>
+            );
+          })}
+          {fieldsToAdd({ kind: 'shared' }).length > 0 && (
+            <AddFieldRow onPress={() => setAddingTo({ kind: 'shared' })} />
+          )}
         </View>
         <Text style={[styles.help, { color: colors.inkMuted }]}>{copy.scan.letServer}</Text>
         {batch.documents.map((document, index) => (
@@ -193,6 +263,12 @@ export default function BatchDetailsScreen() {
             onTitle={(title) => apply({ kind: 'own', documentId: document.id }, { title })}
             onPick={(field) => setPicker({ scope: { kind: 'own', documentId: document.id }, field })}
             onReset={(field) => apply({ kind: 'own', documentId: document.id }, { [field]: undefined })}
+            customFields={customFields}
+            customText={customText}
+            canAddField={fieldsToAdd({ kind: 'own', documentId: document.id }).length > 0}
+            onAddField={() => setAddingTo({ kind: 'own', documentId: document.id })}
+            onOpenField={(fieldId) => openCustomField({ kind: 'own', documentId: document.id }, fieldId)}
+            onResetField={(fieldId) => removeCustomField({ kind: 'own', documentId: document.id }, fieldId)}
           />
         ))}
         {uploadFailed && (
@@ -204,6 +280,42 @@ export default function BatchDetailsScreen() {
       <View style={[styles.bottom, { borderTopColor: colors.line }]}>
         <Button label={copy.scan.upload(batch.documents.length)} large busy={uploading} onPress={upload} />
       </View>
+      {addingTo !== null && (
+        <Picker
+          visible
+          title={copy.customFields.add}
+          items={fieldsToAdd(addingTo)}
+          selected={[]}
+          onClose={() => setAddingTo(null)}
+          onDone={(ids) => {
+            const scope = addingTo;
+            setAddingTo(null);
+            if (ids[0] !== undefined) {
+              openCustomField(scope, ids[0]);
+            }
+          }}
+        />
+      )}
+      {customField !== null && (
+        <CustomFieldSheet
+          field={customField.field}
+          start={customField.start}
+          clearLabel={customField.scope.kind === 'shared' ? copy.customFields.removeFromBatch : copy.customFields.none}
+          onSet={(value) => {
+            setCustomFieldValue(customField.scope, customField.field.id, value);
+            setCustomField(null);
+          }}
+          onClear={() => {
+            if (customField.scope.kind === 'shared') {
+              removeCustomField(customField.scope, customField.field.id);
+            } else {
+              setCustomFieldValue(customField.scope, customField.field.id, null);
+            }
+            setCustomField(null);
+          }}
+          onClose={() => setCustomField(null)}
+        />
+      )}
       {open !== null && (
         <Picker
           visible
@@ -258,6 +370,22 @@ function Row({ label, first = false, onPress, accessibilityValue, trailing, chil
   );
 }
 
+function AddFieldRow({ onPress }: { onPress: () => void }) {
+  const colors = useColors();
+  return (
+    <View style={[styles.row, { borderTopWidth: 1, borderTopColor: colors.line }]}>
+      <Pressable
+        accessibilityRole="button"
+        onPress={onPress}
+        style={({ pressed }) => [styles.rowPress, pressed && { backgroundColor: colors.surfaceSunken }]}
+      >
+        <Icon name="plus" color={colors.accent} size={18} />
+        <Text style={[styles.value, { color: colors.accent }]}>{copy.customFields.add}</Text>
+      </Pressable>
+    </View>
+  );
+}
+
 type DocumentDetailsProps = {
   document: DraftDocument;
   number: number;
@@ -267,9 +395,16 @@ type DocumentDetailsProps = {
   onTitle: (title: string) => void;
   onPick: (field: FieldName) => void;
   onReset: (field: FieldName) => void;
+  customFields: CustomField[];
+  customText: (fieldId: number, value: WireValue) => string;
+  canAddField: boolean;
+  onAddField: () => void;
+  onOpenField: (fieldId: number) => void;
+  onResetField: (fieldId: number) => void;
 };
 
-function DocumentDetails({ document, number, shared, nameFor, tagNames, onTitle, onPick, onReset }: DocumentDetailsProps) {
+function DocumentDetails(props: DocumentDetailsProps) {
+  const { document, number, shared, nameFor, tagNames, onTitle, onPick, onReset } = props;
   const colors = useColors();
   const own = document.metadata;
   const firstPage = document.kind === 'pages' ? document.pages[0] : undefined;
@@ -341,6 +476,26 @@ function DocumentDetails({ document, number, shared, nameFor, tagNames, onTitle,
         {(sharedTags.length > 0 || ownTags.length === 0) && fromBatch(tagNames(sharedTags), sharedTags.length > 0)}
       </Row>
       {oneOfRow('storagePathId')}
+      {resolveCustomFields(shared.customFields, own.customFields).map((entry) => {
+        const text = props.customText(entry.fieldId, entry.value);
+        const name = props.customFields.find((field) => field.id === entry.fieldId)?.name ?? String(entry.fieldId);
+        return (
+          <Row
+            key={`custom-${entry.fieldId}`}
+            label={name}
+            onPress={() => props.onOpenField(entry.fieldId)}
+            accessibilityValue={`${text}, ${entry.fromBatch ? copy.scan.fromBatch : copy.scan.onlyThis}`}
+            trailing={
+              entry.fromBatch ? undefined : (
+                <IconButton icon="close" label={copy.scan.useBatchValue(name)} onPress={() => props.onResetField(entry.fieldId)} color={colors.inkMuted} />
+              )
+            }
+          >
+            {entry.fromBatch ? fromBatch(text, true) : onlyThis(text)}
+          </Row>
+        );
+      })}
+      {props.canAddField && <AddFieldRow onPress={props.onAddField} />}
     </View>
   );
 }
