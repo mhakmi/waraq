@@ -1,6 +1,5 @@
 {
   "name": "waraq",
-  "version": "0.2.0",
   "private": true,
   "main": "index.ts",
   "scripts": {
