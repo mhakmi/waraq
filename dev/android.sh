@@ -12,6 +12,7 @@
 #   dev/android.sh flow          sign in, search, edit a title, and mark a document done, then the key screens in dark and large text
 #   dev/android.sh scan          scan two documents, rotate and split, set a shared tag, stop at Upload, then share a PDF in
 #   dev/android.sh upload        scan and upload three documents, then one killed mid-send, then one sent by the background task
+#   dev/android.sh settings      theme, labels, permissions as admin and as a limited user, and the crash log, then dark and large text
 #   dev/android.sh pdf-check     run the PDF writer's checks on the emulator, then open its 10-page PDF on the Mac
 #   dev/android.sh logs          print the app's log lines
 #   dev/android.sh adb <args>    run adb against this project's own adb server
@@ -390,13 +391,13 @@ launch_signed_out() {
 }
 
 sign_in() {
-  local run=$1 password=$2
+  local run=$1 password=$2 username=${3:-admin}
   launch_signed_out
   shot "$run-1-address"
   type_into "Server address" "$SIGN_IN_ADDRESS"
   tap "Continue"
   wait_for "Found Paperless-ngx 3.0 or newer at ${SIGN_IN_ADDRESS#http://}" 20
-  type_into "Username" admin
+  type_into "Username" "$username"
   type_into "Password" "$password"
   shot "$run-2-credentials"
   tap "Sign in"
@@ -584,6 +585,257 @@ flow() {
   adb shell settings put system font_scale 1.3
   key_screens large-text
   echo "flow passed, screenshots in $SHOTS"
+}
+
+screen_contains() {
+  adb shell uiautomator dump /sdcard/ui.xml > /dev/null 2>&1 || true
+  adb shell cat /sdcard/ui.xml | grep -q -F "$1"
+}
+
+hide_keyboard() {
+  if adb shell dumpsys input_method | grep -q 'mInputShown=true'; then
+    press_back
+  fi
+}
+
+wait_for_containing() {
+  local attempt
+  for attempt in $(seq 1 "$2"); do
+    if screen_contains "$1"; then
+      return 0
+    fi
+    sleep 1
+  done
+  echo "gave up waiting for a node containing \"$1\"" >&2
+  return 1
+}
+
+settings_cleanup() {
+  python3 - "http://localhost:8010" << 'EOF'
+import base64, json, sys, urllib.request
+
+server = sys.argv[1]
+auth = base64.b64encode(b'admin:waraq-dev-password').decode()
+
+def call(method, path, body=None):
+    request = urllib.request.Request(
+        f'{server}/api/{path}',
+        method=method,
+        data=None if body is None else json.dumps(body).encode(),
+        headers={'Authorization': f'Basic {auth}', 'Accept': 'application/json; version=10', 'Content-Type': 'application/json'},
+    )
+    with urllib.request.urlopen(request) as response:
+        return json.loads(response.read() or 'null')
+
+made = {'tags': ['Flow tag', 'Flow tag renamed'], 'custom_fields': ['Flow field']}
+for kind, names in made.items():
+    for item in call('GET', f'{kind}/?page_size=1000')['results']:
+        if item['name'] in names:
+            call('DELETE', f"{kind}/{item['id']}/")
+for user in call('GET', 'users/?page_size=1000')['results']:
+    if user['username'] == 'flow-viewer':
+        call('DELETE', f"users/{user['id']}/")
+EOF
+}
+
+make_viewer() {
+  curl -sf -u admin:waraq-dev-password -H 'Accept: application/json; version=10' -H 'Content-Type: application/json' \
+    -X POST http://localhost:8010/api/users/ \
+    -d '{"username":"flow-viewer","password":"flow-viewer-password","user_permissions":["view_uisettings","view_document","view_tag","view_note","add_note"]}' \
+    > /dev/null
+}
+
+open_settings() {
+  tap_by_description "Account and settings"
+  wait_for "Appearance" 10
+}
+
+settings_screens() {
+  local run=$1
+  open_settings
+  shot "settings-$run-1"
+  scroll_to "About"
+  shot "settings-$run-2-scrolled"
+  scroll_to_top
+  tap "Tags"
+  wait_for "New tag" 20
+  shot "settings-$run-3-tags"
+  tap_by_description "New tag"
+  wait_for "Inbox tag" 5
+  sleep 2
+  shot "settings-$run-4-new-tag"
+  hide_keyboard
+  tap "Cancel" 2> /dev/null || true
+  sleep 1
+  tap_by_description "Back"
+  wait_for "Appearance" 10
+  scroll_to "What your account can do"
+  tap "What your account can do"
+  wait_for "Documents" 20
+  shot "settings-$run-5-permissions"
+  press_back
+  scroll_to "Send a crash report"
+  tap "Send a crash report"
+  wait_for "Crash report" 10
+  shot "settings-$run-6-crash-log"
+  press_back
+  press_back
+}
+
+edit_labels() {
+  local run=$1
+  tap "Tags"
+  wait_for "New tag" 20
+  tap_by_description "New tag"
+  wait_for "Inbox tag" 5
+  sleep 2
+  type_into "Name" "Flow%stag"
+  sleep 1
+  hide_keyboard
+  tap_by_description "Red"
+  tap "Inbox tag" android.widget.Switch
+  shot "settings-$run-labels-1-new-tag"
+  tap "Create"
+  wait_for "Flow tag" 20
+  shot "settings-$run-labels-2-tag-made"
+  tap "Flow tag"
+  wait_for "Edit Flow tag" 5
+  tap "Name" android.widget.EditText
+  adb shell input keyevent KEYCODE_MOVE_END
+  adb shell input text "%srenamed"
+  sleep 1
+  hide_keyboard
+  tap "Save"
+  wait_for "Flow tag renamed" 20
+  shot "settings-$run-labels-3-tag-renamed"
+  tap "Flow tag renamed"
+  wait_for "Edit Flow tag renamed" 5
+  tap_by_description "Delete"
+  wait_for "Delete the tag Flow tag renamed?" 5
+  shot "settings-$run-labels-4-delete-tag"
+  tap "DELETE"
+  sleep 3
+  if [ -n "$(node_bounds "Flow tag renamed")" ]; then
+    echo "the tag is still in the list" >&2
+    return 1
+  fi
+  press_back
+
+  scroll_to "Custom fields"
+  tap "Custom fields"
+  wait_for "New custom field" 20
+  tap_by_description "New custom field"
+  wait_for "Choice from a list" 5
+  sleep 2
+  type_into "Name" "Flow%sfield"
+  sleep 1
+  hide_keyboard
+  tap "Choice from a list"
+  wait_for "Choice 1" 5
+  type_into "Choice 1" Card
+  sleep 1
+  hide_keyboard
+  type_into "Choice 2" Cash
+  sleep 1
+  hide_keyboard
+  shot "settings-$run-labels-5-new-field"
+  tap "Create"
+  wait_for "Flow field" 20
+  shot "settings-$run-labels-6-field-made"
+  tap "Flow field"
+  wait_for "Card, Cash" 5
+  shot "settings-$run-labels-7-field"
+  tap_by_description "Delete"
+  wait_for "Delete the custom field Flow field?" 5
+  tap "DELETE"
+  sleep 3
+  if [ -n "$(node_bounds "Flow field")" ]; then
+    echo "the custom field is still in the list" >&2
+    return 1
+  fi
+  press_back
+}
+
+test_crash() {
+  local run=$1
+  adb shell am start -a android.intent.action.VIEW -d "waraq://settings/crash-test" "$APP_ID" > /dev/null
+  wait_for "Something went wrong" 20
+  shot "settings-$run-crash-1-screen"
+  press_back
+  wait_for "Appearance" 10
+  scroll_to "Send a crash report"
+  tap "Send a crash report"
+  wait_for_containing "Test crash from the settings flow" 10
+  wait_for_containing "Test rejection from the settings flow" 10
+  shot "settings-$run-crash-2-log"
+  tap "Send the report"
+  sleep 3
+  shot "settings-$run-crash-3-share-sheet"
+  press_back
+  wait_for "Crash report" 10
+  press_back
+  press_back
+}
+
+settings() {
+  if ! unzip -p "$APK" assets/app.config | grep -q '"crashTestScreen":true'; then
+    echo "The APK has no crash test screen. Build it with: WARAQ_CRASH_TEST=1 dev/android.sh build" >&2
+    return 1
+  fi
+  trap 'reset_display; settings_cleanup' EXIT
+  reset_display
+  settings_cleanup
+  make_viewer
+
+  sign_in settings-light waraq-dev-password
+  wait_for "Inbox" 30
+  open_settings
+  shot settings-light-settings-1
+  tap "Dark"
+  sleep 2
+  shot settings-light-settings-2-dark-chosen
+  tap "Light"
+  sleep 1
+  tap "System"
+  sleep 1
+  edit_labels light
+  scroll_to "What your account can do"
+  tap "What your account can do"
+  wait_for "Documents" 20
+  shot settings-light-permissions-admin
+  scroll_to "Groups"
+  shot settings-light-permissions-admin-scrolled
+  press_back
+  test_crash light
+
+  adb shell cmd uimode night yes > /dev/null
+  sleep 2
+  settings_screens dark
+  reset_display
+  sleep 2
+  adb shell settings put system font_scale 1.3
+  sleep 2
+  settings_screens large-text
+  reset_display
+  sleep 2
+
+  open_settings
+  tap "Sign out"
+  wait_for "Sign out?" 5
+  shot settings-light-sign-out
+  tap "SIGN OUT"
+  wait_for "Connect to your server" 20
+
+  # Paperless-ngx allows five sign-in requests a minute from one address, and each sign-in makes two.
+  sleep 61
+  sign_in settings-viewer flow-viewer-password flow-viewer
+  wait_for "Inbox" 30
+  open_settings
+  shot settings-viewer-settings
+  tap "What your account can do"
+  wait_for "Documents" 20
+  shot settings-viewer-permissions
+  echo "settings flow passed, screenshots in $SHOTS"
 }
 
 # The scanner's camera follows the emulator's physical model: a position in metres and a rotation
@@ -1036,7 +1288,7 @@ case "${1:-}" in
     require_claim
     install_bundle "${2:-}"
     ;;
-  boot | install | flow | scan | upload | logs | stop)
+  boot | install | flow | scan | upload | settings | logs | stop)
     require_claim
     "$1"
     ;;
