@@ -187,7 +187,12 @@ function DocumentCard({ document, number, small, onEdit, onDiscard }: DocumentCa
           <IconButton icon="trash" label={copy.scan.discardDocument(number)} onPress={onDiscard} color={colors.inkMuted} />
         </View>
       </View>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.strip}>
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={styles.strip}
+        importantForAccessibility="no-hide-descendants"
+      >
         {document.kind === 'pages' ? (
           document.pages.map((page) => (
             <PageThumb
