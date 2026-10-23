@@ -337,7 +337,7 @@ const styles = StyleSheet.create({
   noticeText: { flex: 1, fontSize: 14.5 },
   error: { fontSize: 14.5 },
   field: { gap: 6 },
-  chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  chips: { flexDirection: 'row', flexWrap: 'wrap', columnGap: 8 },
   readOnly: { fontSize: 16, paddingBlock: 8 },
   addField: { alignItems: 'flex-start' },
 });

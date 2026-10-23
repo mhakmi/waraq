@@ -1,6 +1,6 @@
-import { Pressable, StyleSheet, Text } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 
-import { useColors } from '../theme';
+import { touchTarget, useColors } from '../theme';
 import { Icon, type IconName } from './Icon';
 
 type ChipProps = {
@@ -21,18 +21,23 @@ export function Chip({ label, onPress, selected = false, icon, trailingIcon, acc
       accessibilityLabel={accessibilityLabel ?? label}
       accessibilityState={{ selected }}
       onPress={onPress}
-      hitSlop={4}
-      style={({ pressed }) => [
-        styles.chip,
-        selected
-          ? { backgroundColor: colors.accentSoft, borderColor: colors.accentSoft }
-          : { backgroundColor: colors.surfaceRaised, borderColor: colors.line },
-        pressed && { opacity: 0.7 },
-      ]}
+      style={styles.target}
     >
-      {icon && <Icon name={icon} color={ink} size={18} />}
-      {label !== '' && <Text style={[styles.label, { color: ink }]}>{label}</Text>}
-      {trailingIcon && <Icon name={trailingIcon} color={ink} size={18} />}
+      {({ pressed }) => (
+        <View
+          style={[
+            styles.chip,
+            selected
+              ? { backgroundColor: colors.accentSoft, borderColor: colors.accentSoft }
+              : { backgroundColor: colors.surfaceRaised, borderColor: colors.line },
+            pressed && { opacity: 0.7 },
+          ]}
+        >
+          {icon && <Icon name={icon} color={ink} size={18} />}
+          {label !== '' && <Text style={[styles.label, { color: ink }]}>{label}</Text>}
+          {trailingIcon && <Icon name={trailingIcon} color={ink} size={18} />}
+        </View>
+      )}
     </Pressable>
   );
 }
@@ -54,6 +59,7 @@ export function TagPill({ name, inbox }: { name: string; inbox: boolean }) {
 }
 
 const styles = StyleSheet.create({
+  target: { minHeight: touchTarget, minWidth: touchTarget, justifyContent: 'center' },
   chip: {
     minHeight: 40,
     flexDirection: 'row',

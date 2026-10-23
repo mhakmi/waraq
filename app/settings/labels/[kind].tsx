@@ -294,7 +294,8 @@ function LabelSheet({ kind, item, onClose }: { kind: LabelKind; item: LabelItem 
             accessibilityLabel={copy.labels.inboxSwitch}
             value={draft.isInboxTag}
             onValueChange={(isInboxTag) => setDraft({ ...draft, isInboxTag })}
-            trackColor={{ true: colors.accent, false: colors.outline }}
+            style={styles.switch}
+            trackColor={{ true: colors.accent, false: colors.surfaceSunken }}
             thumbColor={draft.isInboxTag ? colors.onAccent : colors.inkMuted}
           />
         </View>
@@ -433,6 +434,7 @@ function FixedFieldType({ item }: { item: LabelItem }) {
 }
 
 const styles = StyleSheet.create({
+  switch: { minWidth: touchTarget, minHeight: touchTarget },
   fill: { flex: 1 },
   loading: { marginBlockStart: 48 },
   search: {
@@ -446,7 +448,7 @@ const styles = StyleSheet.create({
     paddingInlineEnd: 4,
     borderRadius: 28,
   },
-  searchInput: { flex: 1, minWidth: 0, fontSize: 16 },
+  searchInput: { flex: 1, minWidth: 0, alignSelf: 'stretch', fontSize: 16 },
   listEnd: { paddingBlockEnd: 32 },
   nothing: { paddingInline: 20, paddingBlock: 16, fontSize: 15 },
   row: { minHeight: 64, flexDirection: 'row', alignItems: 'center', gap: 14, paddingBlock: 10, paddingInline: 20 },
@@ -459,7 +461,7 @@ const styles = StyleSheet.create({
   swatches: { flexDirection: 'row', flexWrap: 'wrap' },
   swatchTarget: { width: touchTarget, height: touchTarget, alignItems: 'center', justifyContent: 'center' },
   swatch: { width: 36, height: 36, borderRadius: 18 },
-  chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  chips: { flexDirection: 'row', flexWrap: 'wrap', columnGap: 8 },
   switchRow: { flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: touchTarget },
   switchText: { flex: 1, minWidth: 0, gap: 2 },
   switchLabel: { fontSize: 15 },

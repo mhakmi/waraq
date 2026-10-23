@@ -55,6 +55,6 @@ export function Field({ label, help, error, plainText = false, trailing, changed
 const styles = StyleSheet.create({
   field: { gap: 6 },
   box: { minHeight: 56, flexDirection: 'row', alignItems: 'center', gap: 8, paddingInlineStart: 16, paddingInlineEnd: 4, borderRadius: 12 },
-  input: { flex: 1, minWidth: 0, fontSize: 16, paddingBlock: 8 },
+  input: { flex: 1, minWidth: 0, alignSelf: 'stretch', fontSize: 16, paddingBlock: 8 },
   help: { fontSize: 13.5 },
 });

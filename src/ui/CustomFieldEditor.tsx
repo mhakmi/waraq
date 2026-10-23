@@ -8,7 +8,7 @@ import { type Draft, type Problem, type TextInput, type WireValue, writeDraft } 
 import type { CustomField } from '../paperless/schemas';
 import { unwrap } from '../query';
 import { useClient, useSignedIn } from '../session';
-import { useColors } from '../theme';
+import { touchTarget, useColors } from '../theme';
 import { Button } from './Button';
 import { Chip } from './Chip';
 import { Field } from './Field';
@@ -92,7 +92,8 @@ function ToggleEditor({ field, draft, onChange, changed, removeButton }: EditorP
           accessibilityLabel={field.name}
           value={draft.on}
           onValueChange={(on) => onChange({ ...draft, on })}
-          trackColor={{ true: colors.accent, false: colors.outline }}
+          style={styles.switch}
+          trackColor={{ true: colors.accent, false: colors.line }}
           thumbColor={draft.on ? colors.onAccent : colors.inkMuted}
         />
         {removeButton}
@@ -246,13 +247,14 @@ function DocumentsEditor({ field, draft, onChange, changed, removeButton }: Edit
 const searchPauseMs = 300;
 
 const styles = StyleSheet.create({
+  switch: { minWidth: touchTarget, minHeight: touchTarget },
   field: { gap: 6 },
   box: { minHeight: 56, flexDirection: 'row', alignItems: 'center', gap: 8, paddingInlineStart: 16, paddingInlineEnd: 4, borderRadius: 12, borderWidth: 1 },
   toggleText: { flex: 1, fontSize: 16 },
   money: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
   currency: { flexBasis: 110, flexGrow: 0 },
   amount: { flexBasis: 160, flexGrow: 1, minWidth: 0 },
-  chips: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 8 },
+  chips: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', columnGap: 8 },
   sheetFoot: { flex: 1, flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'flex-end', gap: 10 },
 });
 

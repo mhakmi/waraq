@@ -188,7 +188,7 @@ const styles = StyleSheet.create({
   iconButton: { width: touchTarget, height: touchTarget, borderRadius: 999, alignItems: 'center', justifyContent: 'center' },
   flipped: { transform: [{ scaleX: -1 }] },
   field: { flex: 1, minHeight: 56, flexDirection: 'row', alignItems: 'center', paddingInlineStart: 16, paddingInlineEnd: 4, borderRadius: 28, borderWidth: 2 },
-  input: { flex: 1, minWidth: 0, fontSize: 16 },
+  input: { flex: 1, minWidth: 0, alignSelf: 'stretch', fontSize: 16 },
   groupHead: { paddingBlockStart: 16, paddingBlockEnd: 6, paddingInline: 20, fontSize: 13.5, fontWeight: '600' },
   suggestion: { minHeight: 56, flexDirection: 'row', alignItems: 'center', gap: 16, paddingInline: 20 },
   suggestionText: { flex: 1, minWidth: 0 },

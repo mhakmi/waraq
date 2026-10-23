@@ -457,7 +457,7 @@ const styles = StyleSheet.create({
   noteBy: { flex: 1, fontSize: 13 },
   noteText: { fontSize: 15 },
   noteAdd: { marginInline: 20, minHeight: 56, flexDirection: 'row', alignItems: 'center', paddingInlineStart: 16, paddingInlineEnd: 4, borderRadius: 12, borderWidth: 1 },
-  noteInput: { flex: 1, minWidth: 0, fontSize: 16, paddingBlock: 8 },
+  noteInput: { flex: 1, minWidth: 0, alignSelf: 'stretch', fontSize: 16, paddingBlock: 8 },
   noteError: { marginInline: 20, marginBlockStart: 6, fontSize: 13.5 },
   collapsed: { minHeight: 56, flexDirection: 'row', alignItems: 'center', gap: 12, marginBlockStart: 20, marginBlockEnd: 12, marginInline: 20, paddingInlineStart: 16, paddingInlineEnd: 10 },
   collapsedTitle: { flex: 1, fontSize: 15, fontWeight: '500' },

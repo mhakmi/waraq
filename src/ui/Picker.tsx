@@ -139,7 +139,7 @@ const styles = StyleSheet.create({
   iconButton: { width: touchTarget, height: touchTarget, borderRadius: 999, alignItems: 'center', justifyContent: 'center' },
   title: { flex: 1, minWidth: 0, fontSize: 22, fontWeight: '500' },
   search: { minHeight: 56, flexDirection: 'row', alignItems: 'center', gap: 10, marginInline: 16, marginBlockEnd: 8, paddingInlineStart: 16, borderRadius: 28 },
-  searchInput: { flex: 1, minWidth: 0, fontSize: 16 },
+  searchInput: { flex: 1, minWidth: 0, alignSelf: 'stretch', fontSize: 16 },
   row: { minHeight: 56, flexDirection: 'row', alignItems: 'center', gap: 12, paddingInline: 16 },
   check: { width: 24, alignItems: 'center' },
   rowText: { flex: 1, minWidth: 0, fontSize: 16 },

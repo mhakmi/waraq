@@ -209,11 +209,11 @@ function Segmented({ value, onChange }: { value: TagMode; onChange: (mode: TagMo
 
 const styles = StyleSheet.create({
   field: { gap: 6 },
-  chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBlockStart: 6 },
+  chips: { flexDirection: 'row', flexWrap: 'wrap', columnGap: 8, marginBlockStart: 2 },
   two: { flexDirection: 'row', gap: 10 },
   icon: { width: touchTarget, height: touchTarget, alignItems: 'center', justifyContent: 'center' },
   footer: { flex: 1, flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'flex-end', gap: 10 },
   segmented: { flexDirection: 'row', borderWidth: 1, borderRadius: 999, overflow: 'hidden' },
-  segment: { flex: 1, minHeight: 44, alignItems: 'center', justifyContent: 'center', paddingInline: 8 },
+  segment: { flex: 1, minHeight: touchTarget, alignItems: 'center', justifyContent: 'center', paddingInline: 8 },
   segmentText: { fontSize: 14.5, fontWeight: '500', textAlign: 'center' },
 });
