@@ -102,6 +102,7 @@ export type DocumentChanges = {
   storagePathId?: number | null;
   tagIds?: number[];
   archiveSerialNumber?: number | null;
+  customFields?: CustomFieldValue[];
 };
 
 export type LabelKind = 'tags' | 'correspondents' | 'documentTypes' | 'storagePaths' | 'customFields';
@@ -319,6 +320,7 @@ function wireChanges(changes: DocumentChanges): Record<string, unknown> {
     storage_path: changes.storagePathId,
     tags: changes.tagIds,
     archive_serial_number: changes.archiveSerialNumber,
+    custom_fields: changes.customFields?.map((entry) => ({ field: entry.fieldId, value: entry.value })),
   };
   for (const key of Object.keys(wire)) {
     if (wire[key] === undefined) {
