@@ -31,8 +31,8 @@ describe('documentQuery', () => {
       correspondent__id: 9,
       document_type__id: 4,
       storage_path__id: 3,
-      created__gte: '2026-01-01',
-      created__lte: '2026-12-31',
+      created__date__gte: '2026-01-01',
+      created__date__lte: '2026-12-31',
       ordering: 'title',
     });
   });

@@ -56,11 +56,13 @@ const paperlessRuleParameters: Record<number, RuleParameter> = {
   50: { name: 'has_duplicates' },
 };
 
+export type ViewRules = Pick<SavedView, 'sortField' | 'sortReverse' | 'filterRules'>;
+
 export type ViewParameters =
   | { ok: true; parameters: Record<string, string> }
   | { ok: false; unknownRuleTypes: number[] };
 
-export function viewParameters(view: SavedView): ViewParameters {
+export function viewParameters(view: ViewRules): ViewParameters {
   const parameters: Record<string, string> = {};
   const unknownRuleTypes: number[] = [];
   for (const rule of view.filterRules) {
@@ -85,4 +87,45 @@ export function viewParameters(view: SavedView): ViewParameters {
     parameters.ordering = `${view.sortReverse ? '-' : ''}${view.sortField}`;
   }
   return { ok: true, parameters };
+}
+
+const listOnlyParameters = new Set(['page', 'page_size', 'fields', 'truncate_content']);
+
+export type RulesFromParameters = { ok: true; view: ViewRules } | { ok: false; unknownParameters: string[] };
+
+// The same table as viewParameters, read the other way, so a saved view gives back the list it was saved from.
+export function viewRules(parameters: Record<string, string | number | boolean | undefined>): RulesFromParameters {
+  const filterRules: ViewRules['filterRules'] = [];
+  const unknownParameters: string[] = [];
+  let sortField: string | null = null;
+  let sortReverse = false;
+  for (const [name, value] of Object.entries(parameters)) {
+    if (value === undefined || listOnlyParameters.has(name)) {
+      continue;
+    }
+    const text = String(value);
+    if (name === 'ordering') {
+      sortReverse = text.startsWith('-');
+      sortField = sortReverse ? text.slice(1) : text;
+      continue;
+    }
+    const entry = Object.entries(paperlessRuleParameters).find(
+      ([, parameter]) => parameter.name === name || parameter.whenEmpty === name,
+    );
+    if (entry === undefined) {
+      unknownParameters.push(name);
+      continue;
+    }
+    const [ruleType, parameter] = entry;
+    if (parameter.whenEmpty === name) {
+      filterRules.push({ ruleType: Number(ruleType), value: null });
+    } else {
+      const values = parameter.many ? text.split(',') : [text];
+      filterRules.push(...values.map((one) => ({ ruleType: Number(ruleType), value: one })));
+    }
+  }
+  if (unknownParameters.length > 0) {
+    return { ok: false, unknownParameters };
+  }
+  return { ok: true, view: { sortField, sortReverse, filterRules } };
 }

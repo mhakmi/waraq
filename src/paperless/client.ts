@@ -294,8 +294,8 @@ export function documentQueryParameters(query: DocumentQuery): Record<string, Qu
     correspondent__id: query.correspondentId,
     document_type__id: query.documentTypeId,
     storage_path__id: query.storagePathId,
-    created__gte: query.createdFrom,
-    created__lte: query.createdTo,
+    created__date__gte: query.createdFrom,
+    created__date__lte: query.createdTo,
     ordering,
     page: query.page,
     page_size: query.pageSize,
@@ -524,6 +524,17 @@ export function createPaperlessClient<File>(options: ClientOptions<File>) {
     },
 
     readUiSettings: () => requestJson(connection, 'ui_settings/', UiSettings),
+
+    createSavedView: (name: string, view: Pick<SavedView, 'sortField' | 'sortReverse' | 'filterRules'>) =>
+      requestJson(connection, 'saved_views/', SavedView, {
+        method: 'POST',
+        body: JSON.stringify({
+          name,
+          sort_field: view.sortField,
+          sort_reverse: view.sortReverse,
+          filter_rules: view.filterRules.map((rule) => ({ rule_type: rule.ruleType, value: rule.value })),
+        }),
+      }),
 
     postDocument(fields: UploadFields, file: File, filename: string): Promise<Result<TaskId>> {
       const form = formFromFields(fields);

@@ -1,7 +1,8 @@
 import { beforeAll, describe, expect, test } from 'vitest';
 
-import { viewParameters } from '../src/documents/views';
-import { obtainToken } from '../src/paperless/client';
+import { documentQuery, emptyFilter } from '../src/documents/filter';
+import { viewParameters, viewRules } from '../src/documents/views';
+import { documentQueryParameters, obtainToken } from '../src/paperless/client';
 import type { DocumentId, IsoDate, SavedView } from '../src/paperless/schemas';
 import {
   client,
@@ -265,5 +266,34 @@ describe('saved views', () => {
     }
     const result = await client.listDocuments({ savedViewDefaults: parameters.parameters });
     expect(result.ok && result.value.items.map((document) => document.id)).toEqual([older, newer]);
+  });
+
+  test('a search saved as a view lists the same documents when the view is opened', async () => {
+    const marker = uniqueName('saved').replace(/-/g, '');
+    const tag = await createLabel('tags', uniqueName('savedtag'));
+    const wanted = await uploadAndWait(`${marker} wanted`, [tag], '2026-05-01' as IsoDate);
+    await uploadAndWait(`${marker} too early`, [tag], '2025-05-01' as IsoDate);
+
+    const query = documentQuery({ ...emptyFilter, tagIds: [tag], createdFrom: '2026-01-01' as IsoDate }, 'oldest');
+    const rules = viewRules(documentQueryParameters(query));
+    if (!rules.ok) {
+      throw new Error(`unknown parameters ${rules.unknownParameters}`);
+    }
+    const created = await client.createSavedView(uniqueName('view'), rules.view);
+    if (!created.ok) {
+      throw new Error(JSON.stringify(created.error));
+    }
+    const views = await client.listSavedViews();
+    expect(views.ok && views.value.some((item) => item.id === created.value.id)).toBe(true);
+
+    const parameters = viewParameters(created.value);
+    if (!parameters.ok) {
+      throw new Error(`unknown rule types ${parameters.unknownRuleTypes}`);
+    }
+    const fromView = await client.listDocuments({ savedViewDefaults: parameters.parameters });
+    const direct = await client.listDocuments(query);
+    expect(fromView.ok && fromView.value.items.map((document) => document.id)).toEqual([wanted]);
+    expect(direct.ok && direct.value.items.map((document) => document.id)).toEqual([wanted]);
+    await fetch(`${serverUrl}/api/saved_views/${created.value.id}/`, { method: 'DELETE', headers: { Authorization: `Token ${token}` } });
   });
 });
