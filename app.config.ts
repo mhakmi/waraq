@@ -28,6 +28,9 @@ const config: ExpoConfig = {
       data: [{ mimeType: 'application/pdf' }, { mimeType: 'image/*' }],
     })),
   },
+  extra: {
+    crashTestScreen: process.env.WARAQ_CRASH_TEST === '1',
+  },
   plugins: [
     'expo-router',
     'expo-background-task',

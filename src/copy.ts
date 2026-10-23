@@ -519,6 +519,19 @@ export const copy = {
     tryAgain: 'Try again',
   },
 
+  crashLog: {
+    title: 'Crash report',
+    lead: `When ${brand.displayName} hits an error it did not expect, it writes a note here. The notes stay on this phone until you send them, and your token and passwords are taken out. A crash inside Android itself is not recorded.`,
+    empty: 'Nothing has gone wrong so far.',
+    send: 'Send the report',
+    shareTitle: `${brand.displayName} crash report`,
+    shareFailed: 'The share sheet could not open. Try again.',
+    delete: 'Delete the notes',
+    deleteTitle: 'Delete the crash notes?',
+    deleteMessage: 'They are deleted from this phone.',
+    cancel: 'Cancel',
+  },
+
   signIn: {
     heading: 'Connect to your server',
     lead: `${brand.displayName} works with your own Paperless-ngx server.`,
