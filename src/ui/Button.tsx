@@ -55,6 +55,7 @@ export function Button({
         styles.button,
         large && styles.large,
         compact && styles.compact,
+        compact && variant === 'text' && styles.compactText,
         { backgroundColor: look.background, borderColor: look.border, opacity: pressed || disabled ? 0.7 : 1 },
       ]}
     >
@@ -79,6 +80,7 @@ const styles = StyleSheet.create({
   },
   large: { minHeight: 56 },
   compact: { paddingInline: 14 },
+  compactText: { paddingInline: 8 },
   label: { fontSize: 15, fontWeight: '500', textAlign: 'center', flexShrink: 1 },
   largeLabel: { fontSize: 16 },
   link: { textDecorationLine: 'underline' },
