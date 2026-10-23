@@ -43,7 +43,7 @@ const SearchHit = z.object({
 
 export const CustomFieldValue = z.object({
   fieldId: z.number().int(),
-  value: z.union([z.string(), z.number(), z.boolean(), z.array(z.number().int()), z.null()]),
+  value: z.union([z.string(), z.number(), z.boolean(), z.array(z.number().int()), z.record(z.string(), z.unknown()), z.null()]),
 });
 export type CustomFieldValue = z.infer<typeof CustomFieldValue>;
 
