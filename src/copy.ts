@@ -715,4 +715,25 @@ export const copy = {
     none: 'None',
     removeFromBatch: 'Remove from the batch',
   },
+
+  notes: {
+    delete: 'Delete note',
+    deleteTitle: 'Delete this note?',
+    deleteMessage: 'It is deleted on your server for everyone.',
+    cancel: 'Cancel',
+    deleteFailed: 'The note could not be deleted. Check your connection, then try again.',
+    deleteForbidden: 'Your account may not delete notes. Ask the server admin.',
+  },
+
+  documentPermissions: {
+    title: 'Permissions',
+    owner: 'Owner',
+    noOwner: 'No owner. Everyone can see it.',
+    canView: 'Can view',
+    canChange: 'Can change',
+    nobody: 'Only the owner',
+    unknownUser: (id: number) => `User ${id}`,
+    unknownGroup: (id: number) => `Group ${id}`,
+    group: (name: string) => `${name} (group)`,
+  },
 };

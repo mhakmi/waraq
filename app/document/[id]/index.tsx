@@ -10,11 +10,12 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { queryKeys, thumbnailCacheKey } from '../../../src/cache/keys';
 import { copy } from '../../../src/copy';
 import { customFieldRows } from '../../../src/documents/customFields';
+import { permissionRows } from '../../../src/documents/permissions';
 import { copyToFolder, localCopy } from '../../../src/files/download';
 import { mimeTypeOf } from '../../../src/files/opened';
 import { formatCalendarDate, formatInstantDate } from '../../../src/format';
 import { nameOf, useLabels } from '../../../src/labels';
-import type { DocumentDetail, DocumentId } from '../../../src/paperless/schemas';
+import type { DocumentDetail, DocumentId, Note } from '../../../src/paperless/schemas';
 import { errorText, isForbidden, unwrap, useOnline } from '../../../src/query';
 import { useClient, useSignedIn } from '../../../src/session';
 import { radius, touchTarget, useColors } from '../../../src/theme';
@@ -272,6 +273,8 @@ function DocumentBody({ document, onOpen, fetchingFile }: { document: DocumentDe
           </View>
         ))}
 
+      <Permissions document={document} />
+
       <Notes document={document} />
 
       <Pressable
@@ -309,6 +312,17 @@ function Notes({ document }: { document: DocumentDetail }) {
       setText('');
     },
   });
+  const remove = useMutation({
+    mutationFn: (noteId: number) => unwrap(client.deleteNote(document.id, noteId)),
+    onSuccess: (list) => queryClient.setQueryData(notesKey, list),
+  });
+
+  function askToDelete(note: Note) {
+    Alert.alert(copy.notes.deleteTitle, copy.notes.deleteMessage, [
+      { text: copy.notes.cancel, style: 'cancel' },
+      { text: copy.notes.delete, style: 'destructive', onPress: () => remove.mutate(note.id) },
+    ]);
+  }
 
   if (isForbidden(notes.error)) {
     return null;
@@ -318,9 +332,14 @@ function Notes({ document }: { document: DocumentDetail }) {
       <SectionTitle title={copy.detail.notes} />
       {(notes.data ?? []).map((note) => (
         <View key={note.id} style={[styles.card, styles.note, { backgroundColor: colors.surfaceRaised, borderColor: colors.line }]}>
-          <Text style={[styles.noteBy, { color: colors.inkMuted }]}>
-            {copy.detail.noteBy(note.user.username, formatInstantDate(note.created, copy.locale))}
-          </Text>
+          <View style={styles.noteHead}>
+            <Text style={[styles.noteBy, { color: colors.inkMuted }]}>
+              {copy.detail.noteBy(note.user.fullName === '' ? note.user.username : note.user.fullName, formatInstantDate(note.created, copy.locale))}
+            </Text>
+            {document.userCanChange && (
+              <IconButton icon="trash" label={copy.notes.delete} onPress={() => askToDelete(note)} />
+            )}
+          </View>
           <Text style={[styles.noteText, { color: colors.ink }]}>{note.text}</Text>
         </View>
       ))}
@@ -348,6 +367,46 @@ function Notes({ document }: { document: DocumentDetail }) {
         </View>
       )}
       {add.isError && <Text style={[styles.noteError, { color: colors.danger }]}>{copy.detail.noteFailed}</Text>}
+      {remove.isError && (
+        <Text accessibilityLiveRegion="polite" style={[styles.noteError, { color: colors.danger }]}>
+          {isForbidden(remove.error) ? copy.notes.deleteForbidden : copy.notes.deleteFailed}
+        </Text>
+      )}
+    </View>
+  );
+}
+
+function Permissions({ document }: { document: DocumentDetail }) {
+  const colors = useColors();
+  const client = useClient();
+  const { account } = useSignedIn();
+  const common = { staleTime: 5 * 60_000 };
+  const permissions = useQuery({
+    queryKey: queryKeys.documentPermissions(account.id, document.id),
+    queryFn: () => unwrap(client.getDocumentPermissions(document.id)),
+  });
+  const users = useQuery({ ...common, queryKey: queryKeys.people(account.id, 'users'), queryFn: () => unwrap(client.listUsers()) });
+  const groups = useQuery({ ...common, queryKey: queryKeys.people(account.id, 'groups'), queryFn: () => unwrap(client.listGroups()) });
+
+  if (permissions.data === undefined || users.data === undefined || isForbidden(groups.error)) {
+    return null;
+  }
+  const rows = permissionRows(permissions.data, users.data, groups.data ?? [], copy.documentPermissions);
+  return (
+    <View>
+      <SectionTitle title={copy.documentPermissions.title} />
+      {[
+        [copy.documentPermissions.owner, rows.owner],
+        [copy.documentPermissions.canView, rows.canView],
+        [copy.documentPermissions.canChange, rows.canChange],
+      ].map(([label, value]) => (
+        <View key={label} style={[styles.detailRow, { borderTopColor: colors.line }]}>
+          <Text style={[styles.detailLabel, { color: colors.inkMuted }]}>{label}</Text>
+          <View style={styles.detailValue}>
+            <Text style={[styles.detailText, { color: colors.ink }]}>{value}</Text>
+          </View>
+        </View>
+      ))}
     </View>
   );
 }
@@ -391,7 +450,8 @@ const styles = StyleSheet.create({
   tags: { flexDirection: 'row', flexWrap: 'wrap', gap: 4 },
   card: { borderWidth: 1, borderRadius: radius },
   note: { marginInline: 20, marginBlockEnd: 12, paddingBlock: 14, paddingInline: 16 },
-  noteBy: { fontSize: 13, marginBlockEnd: 4 },
+  noteHead: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBlockStart: -8, marginInlineEnd: -10 },
+  noteBy: { flex: 1, fontSize: 13 },
   noteText: { fontSize: 15 },
   noteAdd: { marginInline: 20, minHeight: 56, flexDirection: 'row', alignItems: 'center', paddingInlineStart: 16, paddingInlineEnd: 4, borderRadius: 12, borderWidth: 1 },
   noteInput: { flex: 1, minWidth: 0, fontSize: 16, paddingBlock: 8 },
