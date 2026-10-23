@@ -473,6 +473,52 @@ export const copy = {
     failed: 'Your server could not be reached. Check your connection, then try again.',
   },
 
+  permissions: {
+    title: 'What your account can do',
+    lead: (username: string) => `What ${username} may do on this server. The server admin sets this in Paperless-ngx.`,
+    areas: {
+      documents: 'Documents',
+      notes: 'Notes',
+      tags: 'Tags',
+      correspondents: 'Correspondents',
+      documentTypes: 'Document types',
+      storagePaths: 'Storage paths',
+      customFields: 'Custom fields',
+      savedViews: 'Saved views',
+      shareLinks: 'Share links',
+      workflows: 'Workflows',
+      mailAccounts: 'Mail accounts',
+      mailRules: 'Mail rules',
+      tasks: 'Tasks on the server',
+      history: 'Change history',
+      webSettings: 'Settings in the web app',
+      serverSettings: 'Server configuration',
+      users: 'Users',
+      groups: 'Groups',
+    },
+    special: {
+      statistics: 'See the counts for every document on the server',
+      systemStatus: 'See the server status',
+    },
+    other: 'Other',
+    verbs: { view: 'see', add: 'add', change: 'change', delete: 'delete' },
+    allowed: (verbs: string[]) => {
+      if (verbs.length === 0) {
+        return 'Nothing';
+      }
+      const last = verbs[verbs.length - 1];
+      const listed = verbs.length === 1 ? last : `${verbs.slice(0, -1).join(', ')}${verbs.length > 2 ? ',' : ''} and ${last}`;
+      return listed.charAt(0).toUpperCase() + listed.slice(1);
+    },
+    yes: 'Yes',
+    no: 'No',
+    errorTitle: 'This list could not load',
+    forbidden: 'Your account may not read its own permissions. Ask the server admin.',
+    offlineTitle: 'You are offline',
+    offlineLead: 'The list loads when your phone is back online.',
+    tryAgain: 'Try again',
+  },
+
   signIn: {
     heading: 'Connect to your server',
     lead: `${brand.displayName} works with your own Paperless-ngx server.`,

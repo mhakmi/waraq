@@ -9,6 +9,7 @@ import { copy } from '../../src/copy';
 import { takeSharedFiles } from '../../src/scan/scanning';
 import { discardBatch, loadBatch, onBatchQueued } from '../../src/scan/store';
 import { useSignedIn } from '../../src/session';
+import { useCan } from '../../src/settings/usePermissions';
 import { useColors } from '../../src/theme';
 import { Icon } from '../../src/ui/Icon';
 import { Snackbar, SnackbarProvider, useSnackbarState } from '../../src/ui/Snackbar';
@@ -27,6 +28,7 @@ export default function TabsLayout() {
   const showSnackbar = snackbar.show;
   const { jobs } = useUploadQueue();
   const unfinished = unfinishedCount(jobs, accountId);
+  const mayAddDocuments = useCan()('add', 'documents');
 
   useEffect(() => {
     Scanner.prepare().catch(() => {});
@@ -90,7 +92,9 @@ export default function TabsLayout() {
             }}
           />
         </Tabs>
-        <ScanButton bottom={aboveTabs + 20 + (snackbar.message === null ? 0 : snackbarSpace)} onPress={startScan} />
+        {mayAddDocuments && (
+          <ScanButton bottom={aboveTabs + 20 + (snackbar.message === null ? 0 : snackbarSpace)} onPress={startScan} />
+        )}
         <Snackbar message={snackbar.message} bottom={aboveTabs + 12} onHide={snackbar.hide} />
       </View>
     </SnackbarProvider>

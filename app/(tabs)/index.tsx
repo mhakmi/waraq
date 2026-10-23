@@ -9,6 +9,7 @@ import { copy } from '../../src/copy';
 import { type DocumentPages, positionOf, tagsAfterDone, withDocumentAt, withoutDocument } from '../../src/inbox/done';
 import { inboxSections, inboxTagIds } from '../../src/inbox/rows';
 import { readableItems, useLabels } from '../../src/labels';
+import { useCan } from '../../src/settings/usePermissions';
 import type { DocumentId, DocumentSummary } from '../../src/paperless/schemas';
 import { errorText, unwrap, useOnline } from '../../src/query';
 import { type AppClient, useClient, useSignedIn } from '../../src/session';
@@ -94,6 +95,7 @@ export default function InboxScreen() {
   const tagIds = inboxTagIds(tags.data ?? []);
   const documents = useInboxDocuments(client, account.id, tagIds);
   const markDone = useMarkDone(client, account.id, tagIds);
+  const mayChangeDocuments = useCan()('change', 'documents');
 
   const items = documents.data?.pages.flatMap((page) => page.items) ?? [];
   const sections = inboxSections(items, tags.data ?? [], readableItems(correspondents), new Date());
@@ -140,7 +142,9 @@ export default function InboxScreen() {
           sections={sections}
           keyExtractor={(row) => String(row.document.id)}
           ListHeaderComponent={
-            items.length > 0 ? <Text style={[styles.hint, { color: colors.inkMuted }]}>{copy.inbox.doneHint}</Text> : undefined
+            items.length > 0 && mayChangeDocuments ? (
+              <Text style={[styles.hint, { color: colors.inkMuted }]}>{copy.inbox.doneHint}</Text>
+            ) : undefined
           }
           renderItem={({ item, index }) => (
             <DocumentRow
@@ -150,14 +154,16 @@ export default function InboxScreen() {
               serverUrl={account.serverUrl}
               onPress={() => router.push(`/document/${item.document.id}`)}
               action={
-                <Button
-                  label={copy.inbox.done}
-                  accessibilityLabel={copy.inbox.doneLabel(item.document.title)}
-                  icon="check"
-                  variant="outline"
-                  compact
-                  onPress={() => markDone(item.document)}
-                />
+                mayChangeDocuments && (
+                  <Button
+                    label={copy.inbox.done}
+                    accessibilityLabel={copy.inbox.doneLabel(item.document.title)}
+                    icon="check"
+                    variant="outline"
+                    compact
+                    onPress={() => markDone(item.document)}
+                  />
+                )
               }
             />
           )}
