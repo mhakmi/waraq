@@ -65,6 +65,8 @@ flowchart LR
   other["adb server on 5037<br>scans 5555 to 5585 only"]
 ```
 
+Worktrees of this repo share `.dev-data`, and there is one emulator. Every command that uses it needs a claim from the checkout that runs it, so two worktrees never install over each other's app. A claim held by a checkout that no longer exists is taken over.
+
 ```sh
 dev/android.sh build       # the APK, then its package, SDK levels, and permissions
 dev/android.sh boot
@@ -77,6 +79,8 @@ dev/android.sh pdf-check   # the PDF writer's checks on the emulator, then its 1
 dev/android.sh logs
 dev/android.sh adb devices # any adb command, against port 5038
 dev/android.sh stop        # this emulator and its adb server only
+dev/android.sh claim       # take the emulator for this checkout
+dev/android.sh release     # stop it and give it up
 ```
 
 The APK asks for `INTERNET`, `ACCESS_NETWORK_STATE`, `ACCESS_WIFI_STATE`, `VIBRATE`, `WAKE_LOCK`, and `RECEIVE_BOOT_COMPLETED`. The last two came with the upload queue's background task: WorkManager holds the CPU awake while the task runs, and reschedules the task after a reboot. WorkManager also declares `FOREGROUND_SERVICE` for a foreground service the task never uses, so `app.config.ts` blocks that one. No camera, storage, or media permission.

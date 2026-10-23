@@ -14,6 +14,11 @@
 #   dev/android.sh adb <args>    run adb against this project's own adb server
 #   dev/android.sh fn <name> ...  run one of this script's functions by hand, for example fn tap "Scan"
 #   dev/android.sh stop          stop this emulator and its adb server, and nothing else
+#   dev/android.sh claim         take the emulator for this checkout, refused while another checkout holds it
+#   dev/android.sh release       stop the emulator and give it up
+#
+# Worktrees share .dev-data but there is one emulator, so every command that uses it
+# first needs a claim from the checkout that runs it.
 #
 # JAVA_HOME and ANDROID_HOME come from the environment or from .dev-data/toolchain.env.
 # The SDK may belong to another project, so nothing here writes to it or downloads into it.
@@ -56,6 +61,31 @@ POSTER=$ROOT/dev/fixtures/pdf/lease-renewal.png
 GRPCURL=${GRPCURL:-grpcurl}
 # The address the flows type into the sign-in screen. The upload flow points it at its proxy.
 SIGN_IN_ADDRESS=http://10.0.2.2:8010
+
+OWNER_FILE=$DATA/emulator.owner
+
+claim() {
+  local owner
+  owner=$(cat "$OWNER_FILE" 2>/dev/null || true)
+  if [ -n "$owner" ] && [ "$owner" != "$ROOT" ] && [ -d "$owner" ]; then
+    echo "The emulator belongs to $owner. Wait until it runs dev/android.sh release." >&2
+    exit 1
+  fi
+  echo "$ROOT" > "$OWNER_FILE"
+}
+
+release() {
+  require_claim
+  stop
+  rm -f "$OWNER_FILE"
+}
+
+require_claim() {
+  if [ "$(cat "$OWNER_FILE" 2>/dev/null || true)" != "$ROOT" ]; then
+    echo "Run dev/android.sh claim first. The emulator is shared by every checkout." >&2
+    exit 1
+  fi
+}
 
 mkdir -p "$DATA/home" "$DATA/tmp" "$ANDROID_USER_HOME" "$ANDROID_AVD_HOME" "$LOGS" "$SHOTS"
 # adb and the emulator read and write their keys under $HOME/.android, whatever ANDROID_USER_HOME says.
@@ -874,21 +904,29 @@ stop() {
 }
 
 case "${1:-}" in
-  build | badging | boot | install | flow | scan | upload | logs | stop)
+  build | badging | claim | release)
+    "$1"
+    ;;
+  boot | install | flow | scan | upload | logs | stop)
+    require_claim
     "$1"
     ;;
   pdf-check)
+    require_claim
     pdf_check
     ;;
   adb)
+    require_claim
     shift
     adb_server "$@"
     ;;
   fn)
+    require_claim
     shift
     "$@"
     ;;
   shot)
+    require_claim
     shot "${2:?usage: $0 shot <name>}"
     ;;
   *)
