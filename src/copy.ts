@@ -532,6 +532,11 @@ export const copy = {
     cancel: 'Cancel',
   },
 
+  licenses: {
+    title: 'Open-source licenses',
+    lead: (count: number) => `${brand.displayName} is built on ${count} open-source packages. Each is listed with its version and license.`,
+  },
+
   signIn: {
     heading: 'Connect to your server',
     lead: `${brand.displayName} works with your own Paperless-ngx server.`,
