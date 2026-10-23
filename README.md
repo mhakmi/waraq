@@ -77,7 +77,8 @@ dev/android.sh install-bundle  # the newest bundle's APKs for this emulator, as 
 dev/android.sh install
 dev/android.sh shot inbox  # .dev-data/shots/inbox.png
 dev/android.sh check inbox # every control on the screen: its label, and whether it is at least 48 by 48 dp
-dev/android.sh speak inbox # turns on TalkBack, moves through the controls with Tab, and saves what TalkBack says
+dev/android.sh talkback on # or off
+dev/android.sh speak inbox # with TalkBack on, moves through the controls with Tab and saves what TalkBack says
 dev/android.sh flow        # the documents flow against http://10.0.2.2:8010, described below
 dev/android.sh upload      # the upload flow against the same server, described below
 dev/android.sh scan        # the scan flow, described below

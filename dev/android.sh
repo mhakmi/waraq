@@ -16,7 +16,8 @@
 #   dev/android.sh fields        set a custom field of each type, save a view, add and delete a note, then the same screens in dark and large text
 #   dev/android.sh pdf-check     run the PDF writer's checks on the emulator, then open its 10-page PDF on the Mac
 #   dev/android.sh check <name>  check the current screen's touch targets and labels with dev/screen-check.ts
-#   dev/android.sh speak <name> [n]  move focus n times with Tab under TalkBack and save what it says
+#   dev/android.sh talkback on|off  turn TalkBack on or off
+#   dev/android.sh speak <name> [n]  with TalkBack on, move focus n times with Tab and save what TalkBack says
 #   dev/android.sh logs          print the app's log lines
 #   dev/android.sh adb <args>    run adb against this project's own adb server
 #   dev/android.sh fn <name> ...  run one of this script's functions by hand, for example fn tap "Scan"
@@ -86,6 +87,7 @@ claim() {
 
 release() {
   require_claim
+  talkback off 2> /dev/null || true
   stop
   rm -f "$OWNER_FILE"
 }
@@ -352,13 +354,24 @@ check() {
 
 TALKBACK=com.google.android.marvin.talkback/com.google.android.marvin.talkback.TalkBackService
 
-# TalkBack writes what it says to the log only with its verbose logging on, which is set once by hand
-# in TalkBack's settings, under Advanced settings, Developer settings, Log output level.
+talkback() {
+  case $1 in
+    on)
+      adb shell settings put secure enabled_accessibility_services "$TALKBACK"
+      sleep 8
+      ;;
+    off)
+      adb shell settings delete secure enabled_accessibility_services > /dev/null
+      ;;
+  esac
+}
+
+# Tab moves TalkBack's focus, so a screen can be read without touch gestures. TalkBack writes what
+# it says to the log only with its verbose logging on, which is set once by hand in TalkBack's
+# settings, under Advanced settings, Developer settings, Log output level.
 speak() {
   local name=$1 count=${2:-12} press
   mkdir -p "$DATA/checks"
-  adb shell settings put secure enabled_accessibility_services "$TALKBACK"
-  sleep 4
   adb logcat -c
   for press in $(seq 1 "$count"); do
     adb shell input keyevent KEYCODE_TAB
@@ -368,7 +381,6 @@ speak() {
   adb logcat -d | sed -nE 's/.*Speaking fragment text="([^"]*)".*/\1/p' | grep -v '^Double-tap to' \
     | awk 'NR > 1 && index($0, previous) != 1 { print previous } { previous = $0 } END { if (NR > 0) print previous }' \
     > "$DATA/checks/$name.speech" || true
-  adb shell settings delete secure enabled_accessibility_services > /dev/null
   echo "$name:"
   cat "$DATA/checks/$name.speech"
 }
@@ -1623,6 +1635,10 @@ case "${1:-}" in
   speak)
     require_claim
     speak "${2:?usage: $0 speak <name> [count]}" "${3:-12}"
+    ;;
+  talkback)
+    require_claim
+    talkback "${2:?usage: $0 talkback on|off}"
     ;;
   *)
     sed -n 's/^#   //p' "$0"
