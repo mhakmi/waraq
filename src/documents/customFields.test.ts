@@ -53,6 +53,8 @@ describe('write checks a draft and gives the value Paperless takes', () => {
     ['url', field('url'), text('https://example.com/bill?id=3', 'url'), 'https://example.com/bill?id=3'],
     ['integer', field('integer'), text('-12', 'number'), -12],
     ['float', field('float'), text('0.75', 'number'), 0.75],
+    ['float with a decimal comma', field('float'), text('0,75', 'number'), 0.75],
+    ['monetary with a decimal comma', money, { type: 'money', currency: 'EUR', amount: '12,5' }, 'EUR12.50'],
     ['boolean', field('boolean'), { type: 'toggle', on: false }, false],
     ['date', field('date'), { type: 'date', date: '2026-01-31' as IsoDate }, '2026-01-31'],
     ['select', select, { type: 'choice', optionId: 'a1' }, 'a1'],
@@ -76,9 +78,9 @@ describe('write checks a draft and gives the value Paperless takes', () => {
     ['url with a space', field('url'), text('https://exa mple.com', 'url'), 'notWebAddress'],
     ['integer with decimals', field('integer'), text('1.5', 'number'), 'notWholeNumber'],
     ['integer past 32 bits', field('integer'), text('2147483648', 'number'), 'tooLarge'],
-    ['float with a comma', field('float'), text('1,5', 'number'), 'notNumber'],
+    ['float with a comma that may group thousands', field('float'), text('1,000', 'number'), 'notNumber'],
     ['amount with three decimals', money, { type: 'money', currency: 'CAD', amount: '1.234' }, 'notAmount'],
-    ['amount with a comma', money, { type: 'money', currency: 'CAD', amount: '1,50' }, 'notAmount'],
+    ['amount with a comma that may group thousands', money, { type: 'money', currency: 'CAD', amount: '1,500' }, 'notAmount'],
     ['currency that is not three letters', money, { type: 'money', currency: 'EURO', amount: '1' }, 'notCurrency'],
   ])('refuses %s', (name, definition, draft, problem) => {
     expect(writeDraft(definition, draft)).toEqual({ ok: false, problem });

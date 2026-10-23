@@ -68,6 +68,11 @@ function moneyParts(value: WireValue): { currency: string | null; amount: string
   return match === null ? null : { currency: match[1] ?? null, amount: match[2] };
 }
 
+// A phone keyboard in many locales types a comma for the decimal mark. Three digits after it could be a thousands separator, so that stays refused.
+function withDecimalPoint(text: string): string {
+  return /^-?\d+,\d{1,2}$/.test(text) ? text.replace(',', '.') : text;
+}
+
 function twoDecimals(amount: string): string {
   const [whole, decimals = ''] = amount.split('.');
   return `${whole}.${decimals.padEnd(2, '0')}`;
@@ -103,7 +108,10 @@ export const fieldKinds = {
     const value = Number(text);
     return value > largestInteger || value < smallestInteger ? refused('tooLarge') : written(value);
   }),
-  float: textKind('number', (text) => (/^-?\d+(\.\d+)?$/.test(text) ? written(Number(text)) : refused('notNumber'))),
+  float: textKind('number', (typed) => {
+    const text = withDecimalPoint(typed);
+    return /^-?\d+(\.\d+)?$/.test(text) ? written(Number(text)) : refused('notNumber');
+  }),
   boolean: kind<Extract<Draft, { type: 'toggle' }>>({
     read: (value) => (value === null ? { type: 'toggle', on: false } : typeof value === 'boolean' ? { type: 'toggle', on: value } : null),
     write: (draft) => written(draft.on),
@@ -128,7 +136,7 @@ export const fieldKinds = {
       return parts === null ? null : { type: 'money', currency: parts.currency ?? field.defaultCurrency ?? '', amount: parts.amount };
     },
     write: (draft) => {
-      const amount = draft.amount.trim();
+      const amount = withDecimalPoint(draft.amount.trim());
       const currency = draft.currency.trim().toUpperCase();
       if (amount === '') {
         return written(null);
