@@ -69,7 +69,9 @@ Worktrees of this repo share `.dev-data`, and there is one emulator. Every comma
 
 ```sh
 dev/android.sh build       # the APK, then its package, SDK levels, and permissions
+dev/android.sh bundle      # the app bundle for Google Play, then dev/release-check.sh on it
 dev/android.sh boot
+dev/android.sh install-bundle  # the newest bundle's APKs for this emulator, as Google Play would send them
 dev/android.sh install
 dev/android.sh shot inbox  # .dev-data/shots/inbox.png
 dev/android.sh flow        # the documents flow against http://10.0.2.2:8010, described below
@@ -82,6 +84,8 @@ dev/android.sh stop        # this emulator and its adb server only
 dev/android.sh claim       # take the emulator for this checkout
 dev/android.sh release     # stop it and give it up
 ```
+
+[docs/release.md](docs/release.md) describes the release build: the upload key, the version numbers, the release check, and what Google Play's Data safety form needs.
 
 The APK asks for `INTERNET`, `ACCESS_NETWORK_STATE`, `ACCESS_WIFI_STATE`, `VIBRATE`, `WAKE_LOCK`, and `RECEIVE_BOOT_COMPLETED`. The last two came with the upload queue's background task: WorkManager holds the CPU awake while the task runs, and reschedules the task after a reboot. WorkManager also declares `FOREGROUND_SERVICE` for a foreground service the task never uses, so `app.config.ts` blocks that one. No camera, storage, or media permission.
 
