@@ -1,5 +1,5 @@
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
-import { type ReactNode, useState } from 'react';
+import { type ReactNode, useEffect, useState } from 'react';
 import { StyleSheet, Switch, Text, type TextInputProps, View } from 'react-native';
 
 import { queryKeys } from '../cache/keys';
@@ -182,7 +182,12 @@ function DocumentsEditor({ field, draft, onChange, changed, removeButton }: Edit
   const client = useClient();
   const { account } = useSignedIn();
   const [picking, setPicking] = useState(false);
+  const [typed, setTyped] = useState('');
   const [search, setSearch] = useState('');
+  useEffect(() => {
+    const timer = setTimeout(() => setSearch(typed), searchPauseMs);
+    return () => clearTimeout(timer);
+  }, [typed]);
 
   const linkedQuery = { ids: draft.ids, pageSize: draft.ids.length };
   const linked = useQuery({
@@ -225,7 +230,7 @@ function DocumentsEditor({ field, draft, onChange, changed, removeButton }: Edit
           items={(found.data?.items ?? []).map((document) => ({ id: document.id, name: document.title }))}
           selected={draft.ids}
           multiple
-          onSearch={setSearch}
+          onSearch={setTyped}
           onClose={() => setPicking(false)}
           onDone={(ids) => {
             onChange({ ...draft, ids });
@@ -236,6 +241,9 @@ function DocumentsEditor({ field, draft, onChange, changed, removeButton }: Edit
     </View>
   );
 }
+
+// Searching waits for a pause in typing, so the server gets one request per word, not one per letter.
+const searchPauseMs = 300;
 
 const styles = StyleSheet.create({
   field: { gap: 6 },
