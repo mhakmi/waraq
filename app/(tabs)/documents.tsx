@@ -16,7 +16,7 @@ import {
 } from '../../src/documents/filter';
 import { viewParameters } from '../../src/documents/views';
 import { listRows } from '../../src/inbox/rows';
-import { useLabels } from '../../src/labels';
+import { readableItems, useLabels } from '../../src/labels';
 import type { SavedView } from '../../src/paperless/schemas';
 import { errorText, unwrap, useOnline } from '../../src/query';
 import { useClient, useSignedIn } from '../../src/session';
@@ -125,7 +125,7 @@ export default function DocumentsScreen() {
   }
 
   const items = documents.data?.pages.flatMap((page) => page.items) ?? [];
-  const rows = listRows(items, labels.tags.data ?? [], labels.correspondents.data ?? []);
+  const rows = listRows(items, labels.tags.data ?? [], readableItems(labels.correspondents));
   const count = documents.data?.pages[0]?.count;
   const filtersSet = activeFilterCount(filter);
   const narrowed = filtersSet > 0 || filter.text !== '' || view !== null;

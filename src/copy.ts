@@ -1,4 +1,5 @@
 import brand from './brand.json';
+import type { RowCorrespondent } from './inbox/rows';
 
 export const copy = {
   appName: brand.displayName,
@@ -39,7 +40,16 @@ export const copy = {
   inbox: {
     newCount: (count: number) => `${count} new`,
     groups: { today: 'Today', week: 'This week', earlier: 'Earlier' },
-    meta: (correspondent: string | null, created: string) => `${correspondent ?? 'No correspondent'} · ${created}`,
+    meta: (correspondent: RowCorrespondent, created: string) => {
+      switch (correspondent.kind) {
+        case 'named':
+          return `${correspondent.name} · ${created}`;
+        case 'none':
+          return `No correspondent · ${created}`;
+        case 'unknown':
+          return created;
+      }
+    },
     emptyTitle: 'Your inbox is empty',
     emptyLead: 'New documents show here when your server adds them.',
     noInboxTagTitle: 'Your server has no inbox tag',

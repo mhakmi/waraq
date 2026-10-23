@@ -8,7 +8,7 @@ import { queryKeys } from '../../src/cache/keys';
 import { copy } from '../../src/copy';
 import { type DocumentPages, positionOf, tagsAfterDone, withDocumentAt, withoutDocument } from '../../src/inbox/done';
 import { inboxSections, inboxTagIds } from '../../src/inbox/rows';
-import { useLabels } from '../../src/labels';
+import { readableItems, useLabels } from '../../src/labels';
 import type { DocumentId, DocumentSummary } from '../../src/paperless/schemas';
 import { errorText, unwrap, useOnline } from '../../src/query';
 import { type AppClient, useClient, useSignedIn } from '../../src/session';
@@ -96,7 +96,7 @@ export default function InboxScreen() {
   const markDone = useMarkDone(client, account.id, tagIds);
 
   const items = documents.data?.pages.flatMap((page) => page.items) ?? [];
-  const sections = inboxSections(items, tags.data ?? [], correspondents.data ?? [], new Date());
+  const sections = inboxSections(items, tags.data ?? [], readableItems(correspondents), new Date());
   const count = documents.data?.pages[0]?.count;
   const savedCopy = documents.data !== undefined && (!online || documents.isError);
   const refresh = () => {

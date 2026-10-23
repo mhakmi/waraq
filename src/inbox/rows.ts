@@ -1,10 +1,13 @@
+import type { ReadableList } from '../labels';
 import type { Correspondent, DocumentSummary, Tag } from '../paperless/schemas';
 
 export type InboxGroup = 'today' | 'week' | 'earlier';
 
+export type RowCorrespondent = { kind: 'named'; name: string } | { kind: 'none' } | { kind: 'unknown' };
+
 export type ListRow = {
   document: DocumentSummary;
-  correspondent: string | null;
+  correspondent: RowCorrespondent;
   tags: { id: number; name: string; isInboxTag: boolean }[];
 };
 
@@ -32,12 +35,25 @@ export function inboxTagIds(tags: Tag[]): number[] {
   return tags.filter((tag) => tag.isInboxTag).map((tag) => tag.id);
 }
 
-export function listRows(documents: DocumentSummary[], tags: Tag[], correspondents: Correspondent[]): ListRow[] {
+function rowCorrespondent(id: number | null, namesById: Map<number, string> | null): RowCorrespondent {
+  if (namesById === null) {
+    return { kind: 'unknown' };
+  }
+  if (id === null) {
+    return { kind: 'none' };
+  }
+  const name = namesById.get(id);
+  return name === undefined ? { kind: 'unknown' } : { kind: 'named', name };
+}
+
+export function listRows(documents: DocumentSummary[], tags: Tag[], correspondents: ReadableList<Correspondent>): ListRow[] {
   const tagsById = new Map(tags.map((tag) => [tag.id, tag]));
-  const namesById = new Map(correspondents.map((correspondent) => [correspondent.id, correspondent.name]));
+  const namesById = correspondents.readable
+    ? new Map(correspondents.items.map((correspondent) => [correspondent.id, correspondent.name]))
+    : null;
   return documents.map((document) => ({
     document,
-    correspondent: document.correspondentId === null ? null : namesById.get(document.correspondentId) ?? null,
+    correspondent: rowCorrespondent(document.correspondentId, namesById),
     tags: document.tagIds.flatMap((id) => {
       const tag = tagsById.get(id);
       return tag ? [{ id, name: tag.name, isInboxTag: tag.isInboxTag }] : [];
@@ -48,7 +64,7 @@ export function listRows(documents: DocumentSummary[], tags: Tag[], corresponden
 export function inboxSections(
   documents: DocumentSummary[],
   tags: Tag[],
-  correspondents: Correspondent[],
+  correspondents: ReadableList<Correspondent>,
   now: Date,
 ): InboxSection[] {
   const sections = groups.map((group): InboxSection => ({ group, data: [] }));

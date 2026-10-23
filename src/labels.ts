@@ -1,8 +1,9 @@
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 
 import { queryKeys } from './cache/keys';
-import { unwrap } from './query';
+import type { LabelChanges, LabelKind } from './paperless/client';
+import { isForbidden, unwrap } from './query';
 import { useClient, useSignedIn } from './session';
 
 const labelsStaleMs = 5 * 60_000;
@@ -40,6 +41,12 @@ export function useLabels() {
 
 export type Labels = ReturnType<typeof useLabels>;
 
+export type ReadableList<Item> = { readable: false } | { readable: true; items: Item[] };
+
+export function readableItems<Item>(query: { data?: Item[]; error: Error | null }): ReadableList<Item> {
+  return isForbidden(query.error) ? { readable: false } : { readable: true, items: query.data ?? [] };
+}
+
 export function nameOf(items: Named[] | undefined, id: number | null): string | null {
   if (id === null) {
     return null;
@@ -65,4 +72,26 @@ export function useCreateLabel() {
   }
 
   return { create, failed };
+}
+
+export function useEditLabels(kind: LabelKind) {
+  const client = useClient();
+  const queryClient = useQueryClient();
+  const { account } = useSignedIn();
+
+  async function refresh() {
+    await queryClient.invalidateQueries({ queryKey: queryKeys.labels(account.id, kind) });
+    queryClient.invalidateQueries({ queryKey: queryKeys.allDocumentLists(account.id) });
+  }
+
+  const save = useMutation({
+    mutationFn: ({ id, changes }: { id: number | null; changes: LabelChanges }) =>
+      unwrap(id === null ? client.createLabel(kind, changes) : client.updateLabel(kind, id, changes)),
+    onSuccess: refresh,
+  });
+  const remove = useMutation({
+    mutationFn: (id: number) => unwrap(client.deleteLabel(kind, id)),
+    onSuccess: refresh,
+  });
+  return { save, remove };
 }

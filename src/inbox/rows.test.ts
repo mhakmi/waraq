@@ -2,7 +2,7 @@ import { describe, expect, test } from 'vitest';
 
 import { formatCalendarDate } from '../format';
 import type { Correspondent, DocumentSummary, IsoDate, Tag } from '../paperless/schemas';
-import { groupFor, inboxSections, inboxTagIds } from './rows';
+import { groupFor, inboxSections, inboxTagIds, listRows } from './rows';
 
 function tag(id: number, name: string, isInboxTag = false): Tag {
   return { id, name, color: '#000000', textColor: '#ffffff', isInboxTag, parentId: null, documentCount: 1 };
@@ -55,7 +55,7 @@ describe('inboxSections', () => {
         document(8, new Date(2026, 9, 2, 8, 0).toISOString(), [3, 42], 77),
       ],
       tags,
-      correspondents,
+      { readable: true, items: correspondents },
       now,
     );
     expect(
@@ -64,10 +64,18 @@ describe('inboxSections', () => {
         section.data.map((row) => [row.document.id, row.correspondent, row.tags.map((t) => [t.name, t.isInboxTag])]),
       ]),
     ).toEqual([
-      ['today', [[2, 'Northfield Hydro', [['Bills', false], ['Inbox', true]]]]],
-      ['week', [[7, null, [['Inbox', true]]]]],
-      ['earlier', [[8, null, [['To file', true]]]]],
+      ['today', [[2, { kind: 'named', name: 'Northfield Hydro' }, [['Bills', false], ['Inbox', true]]]]],
+      ['week', [[7, { kind: 'none' }, [['Inbox', true]]]]],
+      ['earlier', [[8, { kind: 'unknown' }, [['To file', true]]]]],
     ]);
+  });
+});
+
+describe('listRows', () => {
+  test('knows no correspondent for any row when the account may not read correspondents', () => {
+    const documents = [document(2, '2026-10-16T08:00:00Z', [], 9), document(7, '2026-10-16T08:00:00Z', [], null)];
+    const rows = listRows(documents, tags, { readable: false });
+    expect(rows.map((row) => row.correspondent)).toEqual([{ kind: 'unknown' }, { kind: 'unknown' }]);
   });
 });
 
