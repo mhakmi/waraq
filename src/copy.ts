@@ -383,6 +383,7 @@ export const copy = {
   },
 
   labels: {
+    rowDetail: (parts: string[]) => parts.join(' · '),
     kinds: {
       tags: { title: 'Tags', one: 'tag', plural: 'tags', create: 'New tag' },
       correspondents: { title: 'Correspondents', one: 'correspondent', plural: 'correspondents', create: 'New correspondent' },
@@ -475,6 +476,7 @@ export const copy = {
 
   permissions: {
     title: 'What your account can do',
+    rowLabel: (area: string, access: string) => `${area}: ${access}`,
     lead: (username: string) => `What ${username} may do on this server. The server admin sets this in Paperless-ngx.`,
     areas: {
       documents: 'Documents',
@@ -535,6 +537,7 @@ export const copy = {
   licenses: {
     title: 'Open-source licenses',
     lead: (count: number) => `${brand.displayName} is built on ${count} open-source packages. Each is listed with its version and license.`,
+    rowLabel: (name: string, version: string, license: string) => `${name} ${version}, ${license}`,
   },
 
   signIn: {

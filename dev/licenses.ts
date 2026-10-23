@@ -1,5 +1,3 @@
-// Lists every package that the dependencies in package.json pull in, with its license, for the about screen.
-// Rerun it before each release: bun run licenses
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';

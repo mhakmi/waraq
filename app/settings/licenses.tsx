@@ -18,7 +18,7 @@ export default function LicensesScreen() {
         renderItem={({ item, index }) => (
           <View
             accessible
-            accessibilityLabel={`${item.name} ${item.version}, ${item.license}`}
+            accessibilityLabel={copy.licenses.rowLabel(item.name, item.version, item.license)}
             style={[styles.row, index > 0 && { borderTopWidth: 1, borderTopColor: colors.line }]}
           >
             <Text style={[styles.name, { color: colors.ink }]}>{item.name}</Text>

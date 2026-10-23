@@ -142,7 +142,7 @@ function rowDetail(kind: LabelKind, item: LabelItem): string {
   if (kind === 'customFields' && item.dataType !== undefined) {
     parts.push(copy.labels.fieldTypes[item.dataType]);
   }
-  return parts.join(' · ');
+  return copy.labels.rowDetail(parts);
 }
 
 function LabelRow({ kind, item, divided, onPress }: { kind: LabelKind; item: LabelItem; divided: boolean; onPress?: () => void }) {

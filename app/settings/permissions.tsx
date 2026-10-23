@@ -74,7 +74,7 @@ function AccessRow({ label, value, allowed, divided }: { label: string; value: s
   return (
     <View
       accessible
-      accessibilityLabel={`${label}: ${value}`}
+      accessibilityLabel={copy.permissions.rowLabel(label, value)}
       style={[styles.row, divided && { borderTopWidth: 1, borderTopColor: colors.line }]}
     >
       <Text style={[styles.label, { color: colors.ink }]}>{label}</Text>
