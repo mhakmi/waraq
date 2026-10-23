@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { KeyboardAvoidingView, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { copy } from '../copy';
@@ -19,7 +19,7 @@ export function Sheet({ visible, title, onClose, headerAction, footer, children 
   const insets = useSafeAreaInsets();
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose} statusBarTranslucent navigationBarTranslucent>
-      <View style={styles.fill}>
+      <KeyboardAvoidingView behavior="padding" style={styles.fill}>
         <Pressable
           accessibilityRole="button"
           accessibilityLabel={copy.picker.close}
@@ -41,7 +41,7 @@ export function Sheet({ visible, title, onClose, headerAction, footer, children 
           </ScrollView>
           {footer && <View style={[styles.foot, { borderTopColor: colors.line }]}>{footer}</View>}
         </View>
-      </View>
+      </KeyboardAvoidingView>
     </Modal>
   );
 }
