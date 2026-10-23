@@ -28,7 +28,13 @@ const config: ExpoConfig = {
       data: [{ mimeType: 'application/pdf' }, { mimeType: 'image/*' }],
     })),
   },
-  plugins: ['expo-router', 'expo-background-task', './plugins/network-security.ts', './plugins/proguard-rules.ts'],
+  plugins: [
+    'expo-router',
+    'expo-background-task',
+    './plugins/network-security.ts',
+    './plugins/proguard-rules.ts',
+    './plugins/release-build.ts',
+  ],
 };
 
 export default config;
