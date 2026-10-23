@@ -13,6 +13,7 @@
 #   dev/android.sh scan          scan two documents, rotate and split, set a shared tag, stop at Upload, then share a PDF in
 #   dev/android.sh upload        scan and upload three documents, then one killed mid-send, then one sent by the background task
 #   dev/android.sh settings      theme, labels, permissions as admin and as a limited user, and the crash log, then dark and large text
+#   dev/android.sh fields        set a custom field of each type, save a view, add and delete a note, then the same screens in dark and large text
 #   dev/android.sh pdf-check     run the PDF writer's checks on the emulator, then open its 10-page PDF on the Mac
 #   dev/android.sh logs          print the app's log lines
 #   dev/android.sh adb <args>    run adb against this project's own adb server
@@ -1257,6 +1258,267 @@ upload() {
   echo "upload flow passed, screenshots in $SHOTS, the dev server holds its seeded data again"
 }
 
+# The fields flow makes these on the dev server and deletes them again at the end. Each custom field
+# is named "Flow " and its type, so the flow can find what it made.
+FLOW_VIEW="Flow view"
+FLOW_NOTE="Flow note"
+
+fields_server() {
+  python3 - "$DEV_SERVER" "$1" "$FLOW_VIEW" "$FLOW_NOTE" << 'EOF'
+import base64, json, sys, urllib.parse, urllib.request
+
+server, action, view_name, note_text = sys.argv[1:5]
+auth = base64.b64encode(b'admin:waraq-dev-password').decode()
+
+def call(method, path, body=None):
+    request = urllib.request.Request(
+        f'{server}/api/{path}',
+        method=method,
+        data=None if body is None else json.dumps(body).encode(),
+        headers={'Authorization': f'Basic {auth}', 'Accept': 'application/json; version=10', 'Content-Type': 'application/json'},
+    )
+    with urllib.request.urlopen(request) as response:
+        return json.loads(response.read() or 'null')
+
+types = {
+    'string': {}, 'url': {}, 'date': {}, 'boolean': {}, 'integer': {}, 'float': {},
+    'monetary': {'default_currency': 'CAD'}, 'documentlink': {},
+    'select': {'select_options': [{'label': 'Chequing'}, {'label': 'Savings'}]}, 'longtext': {},
+}
+fields = [field for field in call('GET', 'custom_fields/?page_size=1000')['results'] if field['name'].startswith('Flow ')]
+
+if action == 'create':
+    names = {field['name'] for field in fields}
+    for data_type, extra in types.items():
+        if f'Flow {data_type}' not in names:
+            call('POST', 'custom_fields/', {'name': f'Flow {data_type}', 'data_type': data_type, 'extra_data': extra})
+elif action == 'show':
+    query = urllib.parse.urlencode({'title__iexact': 'Electricity bill, September', 'fields': 'id,custom_fields'})
+    document = call('GET', f'documents/?{query}')['results'][0]
+    names = {field['id']: field['name'] for field in fields}
+    for entry in document['custom_fields']:
+        print(f"{names.get(entry['field'], entry['field'])}: {json.dumps(entry['value'])}")
+elif action == 'delete':
+    for field in fields:
+        call('DELETE', f"custom_fields/{field['id']}/")
+    for view in call('GET', 'saved_views/?page_size=1000')['results']:
+        if view['name'] == view_name:
+            call('DELETE', f"saved_views/{view['id']}/")
+    for document in call('GET', 'documents/?page_size=1000&fields=id,notes')['results']:
+        for note in document['notes']:
+            if note['note'] == note_text:
+                call('DELETE', f"documents/{document['id']}/notes/?id={note['id']}")
+EOF
+}
+
+scroll_to_end() {
+  local swipe
+  for swipe in 1 2 3; do
+    adb shell input swipe 540 1900 540 500 300
+  done
+  sleep 1
+}
+
+hide_keyboard() {
+  if adb shell dumpsys input_method | grep -q "mInputShown=true"; then
+    adb shell input keyevent KEYCODE_BACK
+    sleep 1
+  fi
+}
+
+add_custom_field() {
+  local name=$1
+  hide_keyboard
+  scroll_to_end
+  tap "Add a custom field"
+  wait_for "$name" 10
+  tap "$name"
+  sleep 1
+}
+
+set_every_field() {
+  local run=$1
+  tap "Edit"
+  wait_for "Edit details" 10
+  add_custom_field "Flow string"
+  type_into "Flow string" "Account%s4471"
+  add_custom_field "Flow url"
+  type_into "Flow url" "https://example.com/bill"
+  add_custom_field "Flow integer"
+  type_into "Flow integer" "-42"
+  add_custom_field "Flow float"
+  type_into "Flow float" "3.25"
+  add_custom_field "Flow longtext"
+  type_into "Flow longtext" "Paid%sby%scheque"
+  add_custom_field "Flow monetary"
+  type_into "Amount" "83.6"
+  add_custom_field "Flow boolean"
+  tap "Flow boolean" android.widget.Switch
+  add_custom_field "Flow date"
+  tap "Flow date, None"
+  wait_for "OK" 10
+  tap "OK"
+  sleep 1
+  add_custom_field "Flow select"
+  tap "Flow select, None"
+  wait_for "Savings" 10
+  tap "Savings"
+  sleep 1
+  add_custom_field "Flow documentlink"
+  scroll_to "Link a document to Flow documentlink"
+  tap "Link a document to Flow documentlink"
+  wait_for "Link documents" 10
+  type_into "Search" "interest"
+  wait_for "Interest income slip" 20
+  tap "Interest income slip"
+  tap "Done"
+  sleep 2
+  hide_keyboard
+  shot "$run-1-edit-fields"
+  scroll_to_top
+  shot "$run-2-edit-fields-top"
+  wait_for "Save 10 changes" 5
+  tap "Save 10 changes"
+  wait_for "Details" 20
+  sleep 2
+  scroll_to "Flow string"
+  shot "$run-3-document-fields"
+  fields_server show
+  tap "Edit"
+  wait_for "Edit details" 10
+  scroll_to "Flow documentlink"
+  shot "$run-4-edit-reopened"
+  tap "Cancel"
+  wait_for "Details" 10
+}
+
+see_permissions_and_note() {
+  local run=$1
+  scroll_to "Permissions"
+  scroll_to "Add a note"
+  shot "$run-5-permissions"
+  type_into "Add a note" "$(echo "$FLOW_NOTE" | sed 's/ /%s/g')"
+  hide_keyboard
+  tap "Add a note" android.widget.Button
+  wait_for "$FLOW_NOTE" 20
+  sleep 1
+  shot "$run-6-note-added"
+  wait_for "Delete note" 10
+  tap "Delete note"
+  wait_for "Delete this note?" 10
+  shot "$run-7-note-confirm"
+  tap "DELETE NOTE"
+  sleep 3
+  shot "$run-8-note-deleted"
+}
+
+save_view() {
+  local run=$1
+  tap "Back"
+  wait_for "Search documents, hydro" 20
+  tap "Filters"
+  wait_for "Save as view" 10
+  shot "$run-9-filters"
+  tap "Save as view"
+  wait_for "Name" 10
+  adb shell input text "$(echo "$FLOW_VIEW" | sed 's/ /%s/g')"
+  shot "$run-10-save-view"
+  tap "Save"
+  wait_for "Saved the view $FLOW_VIEW." 20
+  sleep 1
+  shot "$run-11-view-chip"
+}
+
+batch_fields() {
+  local run=$1
+  local name=hydro-bill-august.pdf media_id
+  adb push "$ROOT/dev/fixtures/pdf/$name" "/sdcard/Download/$name" > /dev/null
+  adb shell am broadcast -a android.intent.action.MEDIA_SCANNER_SCAN_FILE -d "file:///sdcard/Download/$name" > /dev/null
+  media_id=$(adb shell content query --uri content://media/external/file --projection _id \
+    --where "\"_display_name='$name'\"" | sed -nE 's/.*_id=([0-9]+).*/\1/p' | head -1)
+  adb shell am start -a android.intent.action.SEND -t application/pdf \
+    -d "content://media/external/file/$media_id" --eu android.intent.extra.STREAM "content://media/external/file/$media_id" \
+    --grant-read-uri-permission -n "$APP_ID/.MainActivity" > /dev/null
+  wait_for "Review and upload" 20
+  tap "Review and upload"
+  wait_for "For every document" 10
+  tap "Add a custom field"
+  wait_for "Flow select" 10
+  tap "Flow select"
+  wait_for "Set" 10
+  tap "Flow select, None"
+  wait_for "Chequing" 10
+  tap "Chequing"
+  sleep 1
+  shot "$run-12-batch-sheet"
+  tap "Set"
+  sleep 1
+  scroll_to_end
+  shot "$run-13-batch-from-batch"
+  tap "Flow select, Chequing, From the batch"
+  wait_for "Set" 10
+  tap "Flow select, Chequing"
+  wait_for "Savings" 10
+  tap "Savings"
+  sleep 1
+  tap "Set"
+  sleep 1
+  shot "$run-14-batch-only-this"
+  press_back
+  wait_for "Discard batch" 10
+  tap "Discard batch"
+  wait_for "Discard this batch?" 10
+  tap "DISCARD"
+  sleep 1
+}
+
+fields_screens() {
+  local run=$1
+  adb shell am force-stop "$APP_ID"
+  adb shell monkey -p "$APP_ID" -c android.intent.category.LAUNCHER 1 > /dev/null 2>&1
+  wait_for "Interest income slip" 30
+  open_september_bill "$run"
+  scroll_to "Flow string"
+  shot "$run-3-document-fields"
+  scroll_to_end
+  shot "$run-5-permissions"
+  scroll_to_top
+  tap "Edit"
+  wait_for "Edit details" 10
+  scroll_to "Flow monetary"
+  shot "$run-1-edit-fields"
+  tap "Cancel"
+  wait_for "Details" 10
+  tap "Back"
+  tap "Filters"
+  wait_for "Save as view" 10
+  shot "$run-9-filters"
+  press_back
+}
+
+fields() {
+  trap 'reset_display; fields_server delete' EXIT
+  reset_display
+  restore_seed_data
+  fields_server delete
+  fields_server create
+  see_inbox fields-signin
+  open_september_bill fields-light
+  set_every_field fields-light
+  see_permissions_and_note fields-light
+  save_view fields-light
+  batch_fields fields-light
+
+  adb shell cmd uimode night yes > /dev/null
+  fields_screens fields-dark
+  reset_display
+
+  adb shell settings put system font_scale 1.3
+  fields_screens fields-large-text
+  reset_display
+  echo "fields flow passed, screenshots in $SHOTS"
+}
+
 pdf_check() {
   cd "$ROOT/android"
   ./gradlew :scanner:assembleDebugAndroidTest \
@@ -1297,7 +1559,7 @@ case "${1:-}" in
     require_claim
     install_bundle "${2:-}"
     ;;
-  boot | install | flow | scan | upload | settings | logs | stop)
+  boot | install | flow | scan | upload | settings | fields | logs | stop)
     require_claim
     "$1"
     ;;

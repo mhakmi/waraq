@@ -80,6 +80,7 @@ dev/android.sh flow        # the documents flow against http://10.0.2.2:8010, de
 dev/android.sh upload      # the upload flow against the same server, described below
 dev/android.sh scan        # the scan flow, described below
 dev/android.sh settings    # the settings flow, on a build made with WARAQ_CRASH_TEST=1
+dev/android.sh fields      # custom fields, a saved view, and a note against the same server, described below
 dev/android.sh pdf-check   # the PDF writer's checks on the emulator, then its 10-page PDF opened on the Mac
 dev/android.sh logs
 dev/android.sh adb devices # any adb command, against port 5038
@@ -100,6 +101,8 @@ The APK asks for `INTERNET`, `ACCESS_NETWORK_STATE`, `ACCESS_WIFI_STATE`, `VIBRA
 
 `dev/android.sh settings` needs an APK built with `WARAQ_CRASH_TEST=1 dev/android.sh build`, and it stops with that hint otherwise. It makes the user `flow-viewer` on the dev server, who may only view documents, tags, and notes. It signs in as admin, opens Settings, and switches the theme. It makes the tag "Flow tag" with a color and the inbox flag, renames it, and deletes it. It makes the select field "Flow field" with two choices and deletes it. It opens what the account can do, opens the crash test link, and checks that the crash report holds both test errors before it opens the share sheet. Then it shows the Settings screens in dark mode and at font scale 1.3, signs out, and signs in as `flow-viewer` to see a Settings with only the Tags row and a shorter list of permissions. At the end it deletes the user and any label it made.
 
+`dev/android.sh fields` makes one custom field of each type on the dev server, all named `Flow` and the type. It opens the September bill, sets a value of each type on the edit page, saves, and asks the server what it stored. It reopens the edit page, adds a note and deletes it, saves the search for "hydro" as the view "Flow view", and sets a custom field on a shared PDF in batch details, first for every document and then for that one document. Then it shows the document page, the edit page, and the filter sheet again in dark mode and at font scale 1.3. At the end it deletes the fields, the view, and the note.
+
 ## How the document screens get their data
 
 Every list and detail goes through TanStack Query. The app saves its cache to SQLite through `expo-sqlite/kv-store` a second after each change. On the next start, the Inbox, Documents, and any document opened before show at once. While the phone has no network, they say "Offline, showing saved copy". Suggestions, search results, and the counts in the filter sheet are not saved. The cache is dropped on sign-out.
@@ -118,6 +121,9 @@ flowchart LR
 
 - **Filters and saved views.** `documentQuery` turns the search text, the filter sheet, and the sort into query parameters. A saved view's rules become parameters through the same rule table that the Paperless-ngx web app uses. The filter sheet and the sort win where both set one.
 - **Edits.** The edit page sends `PATCH /api/documents/<id>/` with only the fields that differ from the document as it was opened. Dates are `YYYY-MM-DD` strings. The date picker runs in UTC, so a picked day is stored as that day in every time zone.
+- **Custom fields.** `src/documents/customFields.ts` holds one table with an entry for each of Paperless-ngx's ten field types. Each entry reads the server's value into a draft, checks a draft and writes it back, and shows a value as text. The kind of draft picks the editor, so no screen asks for a field's type. A type the app does not know, or a value that does not fit its type, shows as text and goes back to the server as it came. Paperless-ngx replaces a document's whole set of custom fields on a `PATCH`, so the edit page sends every field once one has changed, and nothing when none has.
+- **Saved views.** "Save as view" in the filter sheet turns the search, the filters, and the sort into a saved view's rules with the same rule table read the other way, so opening the view lists the same documents.
+- **Notes and permissions.** A note shows a delete button on a document the account may change. Paperless-ngx deletes a note only for an account with the `delete_note` permission, whoever wrote it, and the page says so when the server refuses. The document page names the owner and who may view and change the document. The names come from the user and group lists, which only an admin may read, so the section hides for other accounts.
 - **Done in the inbox.** Done sends one `PATCH` with the document's tags minus the inbox tags. The row leaves the list at once and comes back where it was if the request fails or the user taps Undo.
 - **Opening a file.** The app downloads the file through the same `expo/fetch` as every other request and writes the body to the cache folder chunk by chunk, so a 20 MB PDF never sits whole in memory. Android then hands the file to the user's PDF app, or to the share sheet. Opened files stay in `opened/` up to 200 MB. Past that, the oldest go first.
 - **Missing permissions.** A label list, the notes, or the saved views that answer 403 hide their part of the screen. The rest keeps working.
