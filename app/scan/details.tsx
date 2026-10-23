@@ -20,6 +20,7 @@ import {
 } from '../../src/scan/batch';
 import { batchQueued, dropQueuedDocuments, updateBatch, useBatch } from '../../src/scan/store';
 import { useSignedIn } from '../../src/session';
+import { useCan } from '../../src/settings/usePermissions';
 import { radius, touchTarget, useColors } from '../../src/theme';
 import { Button } from '../../src/ui/Button';
 import { CustomFieldSheet } from '../../src/ui/CustomFieldEditor';
@@ -54,6 +55,7 @@ export default function BatchDetailsScreen() {
   const { batch } = useBatch();
   const labels = useLabels();
   const createLabel = useCreateLabel();
+  const can = useCan();
   const [picker, setPicker] = useState<OpenPicker>(null);
   const [addingTo, setAddingTo] = useState<Scope | null>(null);
   const [customField, setCustomField] = useState<OpenCustomField>(null);
@@ -328,9 +330,9 @@ export default function BatchDetailsScreen() {
             open.field === 'tagIds' ? copy.picker.createTag : open.field === 'correspondentId' ? copy.picker.createCorrespondent : undefined
           }
           onCreate={
-            open.field === 'tagIds'
+            open.field === 'tagIds' && can('add', 'tags')
               ? (name) => createLabel.create('tags', name)
-              : open.field === 'correspondentId'
+              : open.field === 'correspondentId' && can('add', 'correspondents')
                 ? (name) => createLabel.create('correspondents', name)
                 : undefined
           }

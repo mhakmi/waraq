@@ -23,7 +23,7 @@ type FilterSheetProps = {
   savedViewDefaults?: Record<string, string>;
   labels: Labels;
   onApply: (filter: DocumentFilter) => void;
-  onSaveAsView: (filter: DocumentFilter) => void;
+  onSaveAsView?: (filter: DocumentFilter) => void;
   onClose: () => void;
 };
 
@@ -95,7 +95,7 @@ function OpenFilterSheet({ filter, order, savedViewDefaults, labels, onApply, on
       headerAction={<Button label={copy.filters.clearAll} variant="text" onPress={() => setDraft({ ...emptyFilter, text: draft.text })} />}
       footer={
         <View style={styles.footer}>
-          <Button label={copy.saveView.button} variant="outline" onPress={() => onSaveAsView(draft)} />
+          {onSaveAsView !== undefined && <Button label={copy.saveView.button} variant="outline" onPress={() => onSaveAsView(draft)} />}
           <Button
             label={copy.filters.show(count.data)}
             busy={count.isFetching && count.data === undefined}

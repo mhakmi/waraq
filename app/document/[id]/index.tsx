@@ -24,6 +24,7 @@ import { TagPill } from '../../../src/ui/Chip';
 import { Icon, type IconName } from '../../../src/ui/Icon';
 import { Menu } from '../../../src/ui/Menu';
 import { Message, SavedCopyLine } from '../../../src/ui/Message';
+import { useCan } from '../../../src/settings/usePermissions';
 import { Snackbar, useSnackbarState } from '../../../src/ui/Snackbar';
 import { BackBar } from '../../../src/ui/TopBar';
 
@@ -36,6 +37,7 @@ export default function DocumentScreen() {
   const { account } = useSignedIn();
   const id = Number(useLocalSearchParams<{ id: string }>().id) as DocumentId;
   const snackbar = useSnackbarState();
+  const can = useCan();
   const [menuOpen, setMenuOpen] = useState(false);
   const [fetchingFile, setFetchingFile] = useState(false);
 
@@ -149,7 +151,7 @@ export default function DocumentScreen() {
         onClose={() => setMenuOpen(false)}
         items={[
           { label: copy.detail.download, icon: 'download', onPress: download },
-          ...(document?.userCanChange ? [{ label: copy.detail.delete, icon: 'trash' as const, danger: true, onPress: askToDelete }] : []),
+          ...(document?.userCanChange && can('delete', 'documents') ? [{ label: copy.detail.delete, icon: 'trash' as const, danger: true, onPress: askToDelete }] : []),
         ]}
       />
       <Snackbar message={snackbar.message} bottom={16} onHide={snackbar.hide} />
@@ -303,6 +305,7 @@ function Notes({ document }: { document: DocumentDetail }) {
   const queryClient = useQueryClient();
   const { account } = useSignedIn();
   const [text, setText] = useState('');
+  const can = useCan();
   const notesKey = queryKeys.notes(account.id, document.id);
   const notes = useQuery({ queryKey: notesKey, queryFn: () => unwrap(client.listNotes(document.id)) });
   const add = useMutation({
@@ -336,14 +339,14 @@ function Notes({ document }: { document: DocumentDetail }) {
             <Text style={[styles.noteBy, { color: colors.inkMuted }]}>
               {copy.detail.noteBy(note.user.fullName === '' ? note.user.username : note.user.fullName, formatInstantDate(note.created, copy.locale))}
             </Text>
-            {document.userCanChange && (
+            {document.userCanChange && can('delete', 'notes') && (
               <IconButton icon="trash" label={copy.notes.delete} onPress={() => askToDelete(note)} />
             )}
           </View>
           <Text style={[styles.noteText, { color: colors.ink }]}>{note.text}</Text>
         </View>
       ))}
-      {document.userCanChange && (
+      {document.userCanChange && can('add', 'notes') && (
         <View style={[styles.noteAdd, { backgroundColor: colors.surfaceRaised, borderColor: colors.line }]}>
           <TextInput
             value={text}

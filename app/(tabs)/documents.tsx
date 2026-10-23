@@ -20,6 +20,7 @@ import { readableItems, useLabels } from '../../src/labels';
 import type { SavedView } from '../../src/paperless/schemas';
 import { errorText, unwrap, useOnline } from '../../src/query';
 import { useClient, useSignedIn } from '../../src/session';
+import { useCan } from '../../src/settings/usePermissions';
 import { touchTarget, useColors } from '../../src/theme';
 import { AccountButton } from '../../src/ui/AccountButton';
 import { Button } from '../../src/ui/Button';
@@ -69,6 +70,7 @@ export default function DocumentsScreen() {
   const [view, setView] = useState<{ id: number; parameters: Record<string, string> } | null>(null);
   const [panel, setPanel] = useState<'none' | 'search' | 'filters' | 'sort'>('none');
   const [viewToSave, setViewToSave] = useState<DocumentFilter | null>(null);
+  const can = useCan();
 
   const savedViews = useQuery({
     queryKey: queryKeys.savedViews(account.id),
@@ -252,10 +254,14 @@ export default function DocumentsScreen() {
           setFilter(next);
           setPanel('none');
         }}
-        onSaveAsView={(next) => {
-          setPanel('none');
-          setViewToSave(next);
-        }}
+        onSaveAsView={
+          can('add', 'savedViews')
+            ? (next) => {
+                setPanel('none');
+                setViewToSave(next);
+              }
+            : undefined
+        }
         onClose={closePanel}
       />
       {viewToSave !== null && (

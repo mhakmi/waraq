@@ -21,6 +21,7 @@ import { nameOf, useCreateLabel, useLabels } from '../../../src/labels';
 import type { CustomField, DocumentDetail, DocumentId } from '../../../src/paperless/schemas';
 import { RequestFailed, unwrap } from '../../../src/query';
 import { useClient, useSignedIn } from '../../../src/session';
+import { useCan } from '../../../src/settings/usePermissions';
 import { touchTarget, useColors } from '../../../src/theme';
 import { Button } from '../../../src/ui/Button';
 import { Chip } from '../../../src/ui/Chip';
@@ -78,6 +79,7 @@ function EditForm({ document, customFields }: { document: DocumentDetail; custom
   const [picker, setPicker] = useState<PickerOpen>(null);
   const [customEdits, setCustomEdits] = useState<CustomFieldEdit[]>(() => customFieldEdits(document.customFields, customFields));
   const createLabel = useCreateLabel();
+  const can = useCan();
 
   const archive = parseArchiveNumber(archiveText);
   const fields = archive.ok ? { ...draft, archiveSerialNumber: archive.value } : draft;
@@ -264,7 +266,7 @@ function EditForm({ document, customFields }: { document: DocumentDetail; custom
           selected={draft.tagIds}
           multiple
           createLabel={copy.picker.createTag}
-          onCreate={(name) => createLabel.create('tags', name)}
+          onCreate={can('add', 'tags') ? (name) => createLabel.create('tags', name) : undefined}
           onClose={() => setPicker(null)}
           onDone={picked}
         />
@@ -277,7 +279,7 @@ function EditForm({ document, customFields }: { document: DocumentDetail; custom
           selected={draft.correspondentId === null ? [] : [draft.correspondentId]}
           emptyChoice={copy.picker.none}
           createLabel={copy.picker.createCorrespondent}
-          onCreate={(name) => createLabel.create('correspondents', name)}
+          onCreate={can('add', 'correspondents') ? (name) => createLabel.create('correspondents', name) : undefined}
           onClose={() => setPicker(null)}
           onDone={picked}
         />
