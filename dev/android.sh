@@ -177,6 +177,10 @@ EOF
 # versionCode than the last one.
 bundle() {
   local reuse=$1 version_code version_name last_code output
+  if [ "${WARAQ_CRASH_TEST:-}" = 1 ]; then
+    echo "WARAQ_CRASH_TEST=1 adds a screen that crashes on purpose. Unset it to build a bundle for upload." >&2
+    return 1
+  fi
   load_upload_key
   prebuild
   version_code=$(sed -nE 's/^ *versionCode ([0-9]+)$/\1/p' "$ROOT/android/app/build.gradle")
