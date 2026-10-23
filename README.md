@@ -15,6 +15,8 @@ Waraq needs Paperless-ngx 3.0 or newer. It talks to the REST API at version 10.
 - `modules/scanner/` is a local Expo module in Kotlin. It opens Google's document scanner, writes PDFs, and brings in files picked on the phone or shared from other apps. It imports nothing from Waraq, so it can move into a package of its own.
 - `src/scan/` holds the batch being scanned. `batch.ts` has the data shapes and every edit as a plain function. `store.ts` keeps the batch in SQLite and its files in the app's files folder.
 - `src/upload/` holds the upload queue. Each scanned document becomes one job, and a table in `machine.ts` lists every state change the job allows. `runStep` in `runner.ts` takes one job one step. `store.ts` keeps the jobs in SQLite, `drain.ts` runs every job that is due, and `rows.ts` works out what the Uploads screen shows. These files are plain TypeScript, so the tests run them in Node. `queue.ts` connects them to the phone's database, files, account, and network, and `background.ts` runs the queue while the app is closed.
+- `app/settings/` is Settings, opened from the account picture, with its label lists, what the account can do, the crash report, and the licenses. `src/settings/` holds the parts those screens share: the table of label kinds, the permission areas, and the theme choice.
+- `src/crash/` writes the crash log. `log.ts` formats an entry, takes secrets out of it, and keeps the file under 64 KB. It is plain TypeScript, so the tests run it in Node.
 - `src/copy.ts` holds every word the app shows. Screens take their text from it.
 - `plugins/network-security.ts` writes Android's network security config. It trusts certificate authorities that the user installed, and allows plain HTTP, which `normalizeServerUrl` then allows only for addresses on a home network or VPN.
 - `src/brand.json` holds the app name, slug, and Android package. Change them there.
@@ -77,6 +79,7 @@ dev/android.sh shot inbox  # .dev-data/shots/inbox.png
 dev/android.sh flow        # the documents flow against http://10.0.2.2:8010, described below
 dev/android.sh upload      # the upload flow against the same server, described below
 dev/android.sh scan        # the scan flow, described below
+dev/android.sh settings    # the settings flow, on a build made with WARAQ_CRASH_TEST=1
 dev/android.sh pdf-check   # the PDF writer's checks on the emulator, then its 10-page PDF opened on the Mac
 dev/android.sh logs
 dev/android.sh adb devices # any adb command, against port 5038
@@ -94,6 +97,8 @@ The APK asks for `INTERNET`, `ACCESS_NETWORK_STATE`, `ACCESS_WIFI_STATE`, `VIBRA
 `dev/android.sh upload` scans three documents, one of them with two pages, gives them the Bills tag, uploads them, and waits until the Uploads tab says Done for all three. Then it queues one more and kills the app while the send is still running, to see the job look for its upload instead of sending it twice. The emulator's network shaping leaves traffic to the host alone, so the flow signs in through `dev/slow-proxy.py`, which passes every request to the dev server and reads an upload body at 1 KB a second. Then it turns the network off, queues one more, kills the app, turns the network on, and runs the WorkManager job by hand, to see the document arrive with no screen open. After each part it asks the dev server how many documents named `<job id>.pdf` it holds. At the end it deletes every document the flow uploaded, so the seeded data stays as it was.
 
 `dev/android.sh scan` drives Google's scanner through the emulator's virtual camera. The emulator boots with `-camera-back virtualscene` and hangs the lease renewal fixture, `dev/fixtures/pdf/lease-renewal.png`, on the wall of the virtual room. The script turns the camera toward the poster or a blank wall through the emulator's gRPC `setPhysicalModel` call, so it needs `grpcurl`. Set `GRPCURL` to its path, here or in `.dev-data/toolchain.env`. The flow scans two pages as document one and one page as document two. It rotates a page, splits document one, sets the tag Bills for every document, and stops at the Upload button. Then it opens the saved batch again in dark mode and at font scale 1.3. Last, it shares a PDF into Waraq with `adb shell am start -a android.intent.action.SEND`.
+
+`dev/android.sh settings` needs an APK built with `WARAQ_CRASH_TEST=1 dev/android.sh build`, and it stops with that hint otherwise. It makes the user `flow-viewer` on the dev server, who may only view documents, tags, and notes. It signs in as admin, opens Settings, and switches the theme. It makes the tag "Flow tag" with a color and the inbox flag, renames it, and deletes it. It makes the select field "Flow field" with two choices and deletes it. It opens what the account can do, opens the crash test link, and checks that the crash report holds both test errors before it opens the share sheet. Then it shows the Settings screens in dark mode and at font scale 1.3, signs out, and signs in as `flow-viewer` to see a Settings with only the Tags row and a shorter list of permissions. At the end it deletes the user and any label it made.
 
 ## How the document screens get their data
 
@@ -116,6 +121,46 @@ flowchart LR
 - **Done in the inbox.** Done sends one `PATCH` with the document's tags minus the inbox tags. The row leaves the list at once and comes back where it was if the request fails or the user taps Undo.
 - **Opening a file.** The app downloads the file through the same `expo/fetch` as every other request and writes the body to the cache folder chunk by chunk, so a 20 MB PDF never sits whole in memory. Android then hands the file to the user's PDF app, or to the share sheet. Opened files stay in `opened/` up to 200 MB. Past that, the oldest go first.
 - **Missing permissions.** A label list, the notes, or the saved views that answer 403 hide their part of the screen. The rest keeps working.
+
+## Settings, labels, and permissions
+
+The account picture at the top of Inbox and Documents opens Settings. Sign out lives there now, with the same warning about unfinished uploads.
+
+```mermaid
+flowchart LR
+  avatar["Account picture"] --> settings["Settings"]
+  settings --> theme["Theme<br>kept on the phone"]
+  settings --> labels["One list screen<br>for each kind of label"]
+  settings --> access["What your account can do"]
+  settings --> crash["Crash report"]
+  settings --> licenses["Open-source licenses"]
+  labels --> client["Paperless client<br>createLabel, updateLabel, deleteLabel"]
+  access --> uiSettings["GET /api/ui_settings/<br>permission codenames"]
+```
+
+- **Theme.** System, Light, or Dark. The choice is saved with `expo-sqlite/kv-store` and applied with `Appearance.setColorScheme` before the first screen draws, so every screen that reads `useColors` follows it.
+- **Labels.** Tags, correspondents, document types, storage paths, and custom fields share one screen. `labelEditors` in `src/settings/labelKinds.ts` names the extra fields each kind has: a color and the inbox flag for tags, a path template for storage paths, and a type with its choices for a new custom field. `changesFor` works out what to send, and an edit sends only the fields that changed. Paperless-ngx 3.3.2 refuses a change to a select field that leaves its choices out, so a rename of one sends its choices back as they are.
+- **Permissions.** `/api/ui_settings/` lists the signed-in account's permissions as Django codenames, such as `add_tag`. `accountAccess` groups them by area for the screen, and `useCan` hides an action the account may not take, such as the plus button on a label list, the Scan button, and Done in the inbox. Until the server answers, every action shows, and the server still refuses what the account may not do. A label kind that answers 403 has no row in Settings.
+- **Correspondents on rows.** When the account may not read correspondents, or not the one a document has, a row shows only the date. Before, it said "No correspondent".
+
+An account needs the permission to view UI settings to sign in at all, because sign-in reads the username and the server version from `/api/ui_settings/`. The Paperless-ngx web app needs the same permission.
+
+## The crash log
+
+There is no crash SDK. Errors are written to `crash.log` in the app's files folder and stay there until the user sends them.
+
+- Each screen has an error boundary, set once with `unstable_screenErrorBoundary` on the root stack. A screen that throws shows "Something went wrong" with Try again, and the rest of the app keeps working.
+- `ErrorUtils.setGlobalHandler` catches errors outside React, and Hermes's promise rejection tracker catches rejections that nothing handled.
+- Each entry holds the time, the kind of error, the app version, the Android version, the message, and the stack. The file keeps the newest entries and stays under 64 KB.
+- Before an entry is written, `redact` takes out the account's token and custom header values by value, and by pattern any `Token`, `Bearer`, or `Basic` credential, any value named authorization, password, secret, token, or API key, and the user and password in an address. The tests in `src/crash/log.test.ts` check each one.
+- The entry is written synchronously, because a fatal error ends the process as soon as the handler returns.
+- Settings, Send a crash report, shows the log and opens the share sheet with it. A crash inside Android itself is not recorded.
+
+A build made with `WARAQ_CRASH_TEST=1` has a screen at `waraq://settings/crash-test` that throws while it draws and rejects a promise. Other builds send that link back to Settings.
+
+## Licenses
+
+`bun run licenses` walks the packages that `dependencies` in `package.json` pull in, reads each one's license, and writes `src/settings/licenses.json`, which the licenses screen shows. Rerun it before each release. The list includes Expo's build tools, which do not ship in the app, and it leaves out the Android libraries that Gradle adds, such as ML Kit.
 
 ## How a scan becomes a batch
 
