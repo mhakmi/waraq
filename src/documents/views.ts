@@ -93,7 +93,6 @@ const listOnlyParameters = new Set(['page', 'page_size', 'fields', 'truncate_con
 
 export type RulesFromParameters = { ok: true; view: ViewRules } | { ok: false; unknownParameters: string[] };
 
-// The same table as viewParameters, read the other way, so a saved view gives back the list it was saved from.
 export function viewRules(parameters: Record<string, string | number | boolean | undefined>): RulesFromParameters {
   const filterRules: ViewRules['filterRules'] = [];
   const unknownParameters: string[] = [];

@@ -23,6 +23,7 @@ type FilterSheetProps = {
   savedViewDefaults?: Record<string, string>;
   labels: Labels;
   onApply: (filter: DocumentFilter) => void;
+  onSaveAsView: (filter: DocumentFilter) => void;
   onClose: () => void;
 };
 
@@ -32,7 +33,7 @@ export function FilterSheet(props: FilterSheetProps) {
   return props.visible ? <OpenFilterSheet {...props} /> : null;
 }
 
-function OpenFilterSheet({ filter, order, savedViewDefaults, labels, onApply, onClose }: FilterSheetProps) {
+function OpenFilterSheet({ filter, order, savedViewDefaults, labels, onApply, onSaveAsView, onClose }: FilterSheetProps) {
   const colors = useColors();
   const client = useClient();
   const { account } = useSignedIn();
@@ -94,6 +95,7 @@ function OpenFilterSheet({ filter, order, savedViewDefaults, labels, onApply, on
       headerAction={<Button label={copy.filters.clearAll} variant="text" onPress={() => setDraft({ ...emptyFilter, text: draft.text })} />}
       footer={
         <View style={styles.footer}>
+          <Button label={copy.saveView.button} variant="outline" onPress={() => onSaveAsView(draft)} />
           <Button
             label={copy.filters.show(count.data)}
             busy={count.isFetching && count.data === undefined}
@@ -210,7 +212,7 @@ const styles = StyleSheet.create({
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBlockStart: 6 },
   two: { flexDirection: 'row', gap: 10 },
   icon: { width: touchTarget, height: touchTarget, alignItems: 'center', justifyContent: 'center' },
-  footer: { flex: 1 },
+  footer: { flex: 1, flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'flex-end', gap: 10 },
   segmented: { flexDirection: 'row', borderWidth: 1, borderRadius: 999, overflow: 'hidden' },
   segment: { flex: 1, minHeight: 44, alignItems: 'center', justifyContent: 'center', paddingInline: 8 },
   segmentText: { fontSize: 14.5, fontWeight: '500', textAlign: 'center' },

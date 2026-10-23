@@ -716,6 +716,16 @@ export const copy = {
     removeFromBatch: 'Remove from the batch',
   },
 
+  saveView: {
+    button: 'Save as view',
+    title: 'Save as view',
+    name: 'Name',
+    nameHelp: 'The view shows as a chip above your documents.',
+    save: 'Save',
+    failed: 'The view could not be saved. Check your connection, then try again.',
+    saved: (name: string) => `Saved the view ${name}.`,
+  },
+
   notes: {
     delete: 'Delete note',
     deleteTitle: 'Delete this note?',

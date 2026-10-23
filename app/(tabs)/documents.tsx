@@ -26,6 +26,7 @@ import { Button } from '../../src/ui/Button';
 import { Chip } from '../../src/ui/Chip';
 import { DocumentRow } from '../../src/ui/DocumentRow';
 import { FilterSheet } from '../../src/ui/FilterSheet';
+import { SaveViewSheet } from '../../src/ui/SaveViewSheet';
 import { Icon } from '../../src/ui/Icon';
 import { Message, SavedCopyLine } from '../../src/ui/Message';
 import { type LabelMatch, SearchPanel } from '../../src/ui/SearchPanel';
@@ -67,6 +68,7 @@ export default function DocumentsScreen() {
   const [order, setOrder] = useState<ListOrder>('newest');
   const [view, setView] = useState<{ id: number; parameters: Record<string, string> } | null>(null);
   const [panel, setPanel] = useState<'none' | 'search' | 'filters' | 'sort'>('none');
+  const [viewToSave, setViewToSave] = useState<DocumentFilter | null>(null);
 
   const savedViews = useQuery({
     queryKey: queryKeys.savedViews(account.id),
@@ -92,12 +94,7 @@ export default function DocumentsScreen() {
     setPanel('none');
   }
 
-  function toggleView(saved: SavedView) {
-    if (view?.id === saved.id) {
-      setView(null);
-      setOrder('newest');
-      return;
-    }
+  function openView(saved: SavedView) {
     const parameters = viewParameters(saved);
     if (!parameters.ok) {
       showSnackbar({ text: copy.documents.viewUnusable(saved.name) });
@@ -105,6 +102,15 @@ export default function DocumentsScreen() {
     }
     setView({ id: saved.id, parameters: parameters.parameters });
     setOrder('server');
+  }
+
+  function toggleView(saved: SavedView) {
+    if (view?.id === saved.id) {
+      setView(null);
+      setOrder('newest');
+      return;
+    }
+    openView(saved);
   }
 
   if (panel === 'search') {
@@ -246,8 +252,24 @@ export default function DocumentsScreen() {
           setFilter(next);
           setPanel('none');
         }}
+        onSaveAsView={(next) => {
+          setPanel('none');
+          setViewToSave(next);
+        }}
         onClose={closePanel}
       />
+      {viewToSave !== null && (
+        <SaveViewSheet
+          query={documentQuery(viewToSave, order, view?.parameters)}
+          onSaved={(saved) => {
+            setViewToSave(null);
+            setFilter(emptyFilter);
+            openView(saved);
+            showSnackbar({ text: copy.saveView.saved(saved.name) });
+          }}
+          onClose={() => setViewToSave(null)}
+        />
+      )}
       <Sheet visible={panel === 'sort'} title={copy.documents.sortTitle} onClose={closePanel}>
         <View accessibilityRole="radiogroup">
           {sortChoices.map((choice) => {
