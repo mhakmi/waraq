@@ -183,6 +183,11 @@ bundle() {
   fi
   load_upload_key
   prebuild
+  (cd "$ROOT" && bun run licenses > "$LOGS/licenses.log" 2>&1)
+  if ! git -C "$ROOT" diff --quiet -- src/settings/licenses.json; then
+    echo "src/settings/licenses.json changed when the licenses list was made again. Commit it, then build the bundle." >&2
+    return 1
+  fi
   version_code=$(sed -nE 's/^ *versionCode ([0-9]+)$/\1/p' "$ROOT/android/app/build.gradle")
   version_name=$(sed -nE 's/^ *versionName "([^"]+)"$/\1/p' "$ROOT/android/app/build.gradle")
   last_code=$(cat "$LAST_VERSION_CODE" 2> /dev/null || echo 0)

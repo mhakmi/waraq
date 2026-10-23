@@ -28,7 +28,7 @@ flowchart LR
    dev/android.sh bundle
    ```
 
-   The script builds the bundle for all four Android ABIs, copies it to `.dev-data/bundles/waraq-<version>-<code>.aab`, prints its size and its signer, and runs `dev/release-check.sh` on it. When every check passes and the bundle is signed with the upload key, it records the versionCode in `.dev-data/last-version-code`.
+   The script first makes the open-source licenses list again with `bun run licenses`. If `src/settings/licenses.json` changes, it stops, so commit the new list and run it again. Then it builds the bundle for all four Android ABIs, copies it to `.dev-data/bundles/waraq-<version>-<code>.aab`, prints its size and its signer, and runs `dev/release-check.sh` on it. When every check passes and the bundle is signed with the upload key, it records the versionCode in `.dev-data/last-version-code`.
 
 4. Test the release build on the emulator. Claim the emulator first, and release it when you are done.
 
