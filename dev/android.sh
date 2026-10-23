@@ -262,14 +262,18 @@ badging() {
     | grep -E "^(package|sdkVersion|minSdkVersion|targetSdkVersion|uses-permission|application-label):"
 }
 
+# A worktree may link .avd to the main checkout's, so the pointer is written with the real path at every boot.
+point_to_avd() {
+  cat > "$ANDROID_AVD_HOME/$AVD.ini" <<EOF
+avd.ini.encoding=UTF-8
+path=$(cd "$ANDROID_AVD_HOME" && pwd -P)/$AVD.avd
+target=android-35
+EOF
+}
+
 create_avd() {
   local folder=$ANDROID_AVD_HOME/$AVD.avd
   mkdir -p "$folder"
-  cat > "$ANDROID_AVD_HOME/$AVD.ini" <<EOF
-avd.ini.encoding=UTF-8
-path=$folder
-target=android-35
-EOF
   cat > "$folder/config.ini" <<EOF
 avd.ini.encoding=UTF-8
 AvdId=$AVD
@@ -306,6 +310,7 @@ boot() {
   if [ ! -f "$ANDROID_AVD_HOME/$AVD.avd/config.ini" ]; then
     create_avd
   fi
+  point_to_avd
 
   [ -f "$POSTER" ] || "$ROOT/dev/fixtures/make-documents.sh" > /dev/null
   adb_server start-server
