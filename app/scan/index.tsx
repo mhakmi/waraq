@@ -1,6 +1,6 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
-import { Alert, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Alert, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { copy } from '../../src/copy';
@@ -163,12 +163,13 @@ type DocumentCardProps = {
 
 function DocumentCard({ document, number, small, onEdit, onDiscard }: DocumentCardProps) {
   const colors = useColors();
+  const { fontScale } = useWindowDimensions();
   const thumbHeight = small ? 56 : 88;
   const count = copy.scan.pages(pageCount(document));
   return (
     <View style={[styles.card, { backgroundColor: colors.surfaceRaised, borderColor: colors.line }]}>
       <View style={styles.cardHead}>
-        <View style={styles.names}>
+        <View style={[styles.names, { flexBasis: namesWidth * fontScale }]}>
           <Text style={[styles.documentName, { color: colors.ink }]}>{copy.scan.documentName(number)}</Text>
           <Text style={[styles.meta, { color: colors.inkMuted }]}>
             {document.kind === 'pdf' ? `${copy.scan.pdf} · ${count}` : count}
@@ -212,6 +213,9 @@ function DocumentCard({ document, number, small, onEdit, onDiscard }: DocumentCa
   );
 }
 
+// Room for "Document 1" at the current text size. When the actions do not fit beside it, they move to the next line instead of breaking the name.
+const namesWidth = 90;
+
 const styles = StyleSheet.create({
   fill: { flex: 1 },
   bar: { minHeight: 64, flexDirection: 'row', alignItems: 'center', gap: 4, paddingInlineStart: 4, paddingInlineEnd: 8 },
@@ -224,7 +228,7 @@ const styles = StyleSheet.create({
   cardHead: { minHeight: 48, flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', columnGap: 8 },
   cardActions: { flexDirection: 'row', alignItems: 'center', columnGap: 8, marginInlineStart: 'auto' },
   documentName: { fontSize: 16, fontWeight: '600' },
-  names: { flexGrow: 1, flexBasis: 160, flexDirection: 'row', flexWrap: 'wrap', alignItems: 'baseline', columnGap: 8 },
+  names: { flexGrow: 1, flexDirection: 'row', flexWrap: 'wrap', alignItems: 'baseline', columnGap: 8 },
   meta: { fontSize: 13.5 },
   strip: { gap: 10 },
   problem: { fontSize: 14.5 },
