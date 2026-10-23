@@ -4,7 +4,7 @@ import type { AddressInfo } from 'node:net';
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';
 
 import { connect, type Server, signIn } from '../src/signin/connect';
-import { serverUrl, token } from './helpers';
+import { serverUrl, token, uniqueName } from './helpers';
 
 async function found(address: string): Promise<Server> {
   const result = await connect(address, {}, fetch);
@@ -78,5 +78,35 @@ describe('signIn', () => {
   test('an API token signs in without the token endpoint', async () => {
     const result = await signIn(server, { kind: 'token', token }, fetch, Date.now());
     expect(result.kind === 'signed_in' && result.stored.secrets.token).toBe(token);
+  });
+});
+
+describe('an account without view_uisettings', () => {
+  const username = uniqueName('signin-no-ui-settings');
+  const password = `${uniqueName('pw')}-Aa1!`;
+  let userId: number;
+
+  beforeAll(async () => {
+    const response = await fetch(`${serverUrl}/api/users/`, {
+      method: 'POST',
+      headers: { Authorization: `Token ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username, password, user_permissions: ['view_document'] }),
+    });
+    if (!response.ok) {
+      throw new Error(`Could not create ${username}: ${response.status} ${await response.text()}`);
+    }
+    userId = ((await response.json()) as { id: number }).id;
+  });
+
+  afterAll(async () => {
+    await fetch(`${serverUrl}/api/users/${userId}/`, { method: 'DELETE', headers: { Authorization: `Token ${token}` } });
+  });
+
+  test('gets a token, then fails at Signed in with the missing permission', async () => {
+    const result = await signIn(server, { kind: 'password', username, password, code: null }, fetch, Date.now());
+    expect(result.kind === 'failed' && [result.failure.step, result.failure.problem]).toEqual([
+      'signedIn',
+      { kind: 'no_ui_settings' },
+    ]);
   });
 });

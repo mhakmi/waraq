@@ -687,6 +687,10 @@ export const copy = {
       detail: 'The server is turning sign-ins away for now, because of too many tries.',
       fix: 'Wait a minute, then try again.',
     }),
+    no_ui_settings: () => ({
+      detail: `The server accepted the sign-in, but this account is not allowed to view the server's UI settings. ${brand.displayName} needs that permission to sign in, as the Paperless-ngx web app does.`,
+      fix: 'Ask your server admin to give this account the "view UI settings" permission (view_uisettings), then try again.',
+    }),
     unexpected: () => ({
       detail: `The server sent an answer that ${brand.displayName} did not expect.`,
       fix: 'Copy the connection report and include it when you ask for help.',

@@ -32,6 +32,17 @@ describe('checklistRows', () => {
     expect(checklistRows(attempt).map((row) => row.state)).toEqual(['skipped', 'failed', 'skipped', 'skipped']);
   });
 
+  test('an account without view_uisettings is told which permission to ask the admin for', () => {
+    const attempt: Attempt = {
+      ...wrongPassword,
+      failure: { step: 'signedIn', problem: { kind: 'no_ui_settings' }, technical: null, requestSent: true },
+    };
+    const failed = checklistRows(attempt)[3];
+    expect(failed.state).toBe('failed');
+    expect(failed.fix).toContain('admin');
+    expect(failed.fix).toContain('view_uisettings');
+  });
+
   test('steps after the failure were not tried', () => {
     const attempt: Attempt = {
       ...wrongPassword,

@@ -39,6 +39,7 @@ function problemText(problem: Problem, host: string): { detail: string; fix: str
     case 'bad_token':
     case 'mfa_invalid':
     case 'rate_limited':
+    case 'no_ui_settings':
     case 'unexpected':
       return problems[problem.kind]();
   }

@@ -24,6 +24,7 @@ export type Problem =
   | { kind: 'bad_token' }
   | { kind: 'mfa_invalid' }
   | { kind: 'rate_limited' }
+  | { kind: 'no_ui_settings' }
   | { kind: 'unexpected' };
 
 export type SignInFailure = { step: CheckStep; problem: Problem; technical: string | null; requestSent: boolean };
@@ -185,6 +186,9 @@ export async function signIn(server: Server, credentials: Credentials, fetch: Fe
     appendFile: () => {},
   });
   const info = await client.probeServer();
+  if (!info.ok && info.error.kind === 'forbidden') {
+    return { kind: 'failed', failure: failed('signedIn', { kind: 'no_ui_settings' }, 'GET /api/ui_settings/ answered HTTP 403') };
+  }
   if (!info.ok) {
     return { kind: 'failed', failure: signInFailure(info.error, credentials) };
   }

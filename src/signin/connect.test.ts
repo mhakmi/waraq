@@ -167,6 +167,24 @@ describe('signIn', () => {
     expect(result.kind === 'failed' && result.failure.problem).toEqual({ kind: 'bad_token' });
   });
 
+  test('an account that may not view UI settings fails at Signed in and names the permission', async () => {
+    const { fetch } = serverAnswering((url) =>
+      url.endsWith('/api/token/')
+        ? { status: 200, body: { token: 'abc' } }
+        : { status: 403, body: { detail: 'You do not have permission to perform this action.' } },
+    );
+    const result = await signIn(server, password, fetch, 1_000);
+    expect(result).toEqual({
+      kind: 'failed',
+      failure: {
+        step: 'signedIn',
+        problem: { kind: 'no_ui_settings' },
+        technical: 'GET /api/ui_settings/ answered HTTP 403',
+        requestSent: true,
+      },
+    });
+  });
+
   test('a server below API version 10 fails at Found Paperless-ngx and names its version', async () => {
     const { fetch } = serverAnswering(() => ({
       status: 200,
