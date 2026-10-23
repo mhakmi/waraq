@@ -18,6 +18,7 @@ const config: ExpoConfig = {
       'android.permission.WRITE_EXTERNAL_STORAGE',
       'android.permission.SYSTEM_ALERT_WINDOW',
       'android.permission.USE_BIOMETRIC',
+      'android.permission.VIBRATE',
       'android.permission.USE_FINGERPRINT',
       // WorkManager declares it for its foreground service, which the upload task never uses.
       'android.permission.FOREGROUND_SERVICE',

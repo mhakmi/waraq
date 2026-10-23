@@ -114,10 +114,9 @@ The check reads the files with the SDK's `aapt2` and `zipalign`, the NDK's `llvm
 | `ACCESS_WIFI_STATE` | `@react-native-community/netinfo` | netinfo reports Wi-Fi details with the connection state |
 | `WAKE_LOCK` | AndroidX WorkManager | Keeps the CPU awake while the upload task runs with the app closed |
 | `RECEIVE_BOOT_COMPLETED` | AndroidX WorkManager | Schedules the upload task again after the phone restarts |
-| `VIBRATE` | Expo's app template | Nothing in Waraq's code vibrates the phone. It is a normal permission that needs no prompt. |
 | `dev.mhakmi.waraq.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION` | AndroidX Core | Protects the app's own broadcast receivers on older Android versions. Only Waraq holds it. |
 
-There is no camera, photo, media, storage, or notification permission. Google's document scanner runs inside Google Play services and uses its camera permission ([document scanner](https://developers.google.com/ml-kit/vision/doc-scanner)). Files come in through Android's own file picker and the share sheet, which need no permission. `app.config.ts` blocks the storage, overlay, biometric, and foreground service permissions that libraries declare.
+There is no camera, photo, media, storage, or notification permission. Google's document scanner runs inside Google Play services and uses its camera permission ([document scanner](https://developers.google.com/ml-kit/vision/doc-scanner)). Files come in through Android's own file picker and the share sheet, which need no permission. `app.config.ts` blocks the storage, overlay, biometric, vibrate, and foreground service permissions that libraries and Expo's app template declare. Nothing in Waraq vibrates the phone.
 
 ## Data safety form
 

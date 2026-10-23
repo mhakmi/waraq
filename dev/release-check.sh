@@ -12,7 +12,6 @@ fi
 
 ALLOWED_PERMISSIONS=(
   android.permission.INTERNET
-  android.permission.VIBRATE
   android.permission.ACCESS_NETWORK_STATE
   android.permission.ACCESS_WIFI_STATE
   android.permission.WAKE_LOCK
