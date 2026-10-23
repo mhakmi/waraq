@@ -1,12 +1,13 @@
 import { useColorScheme } from 'react-native';
 
-const light = {
+export const light = {
   surface: '#f7f3ec',
   surfaceRaised: '#fffdf8',
   surfaceSunken: '#ede7dc',
   ink: '#1c2230',
   inkMuted: '#545b69',
   line: '#d9d1c3',
+  outline: '#8a8170',
   accent: '#1f3b6e',
   onAccent: '#ffffff',
   accentSoft: '#dde5f2',
@@ -26,13 +27,14 @@ const light = {
 
 export type Colors = typeof light;
 
-const dark: Colors = {
+export const dark: Colors = {
   surface: '#14171d',
   surfaceRaised: '#1c2028',
   surfaceSunken: '#262b35',
   ink: '#ece8e0',
   inkMuted: '#a8adb7',
   line: '#343a47',
+  outline: '#6c7383',
   accent: '#a9c1ec',
   onAccent: '#0f1e38',
   accentSoft: '#243656',

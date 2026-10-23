@@ -42,7 +42,7 @@ export function FieldBox({ label, value, placeholder, onPress, changed = false, 
         accessibilityRole="button"
         accessibilityLabel={`${label}, ${value ?? placeholder}`}
         onPress={onPress}
-        style={[styles.box, { backgroundColor: colors.surfaceRaised, borderColor: changed ? colors.accent : colors.line }]}
+        style={[styles.box, { backgroundColor: colors.surfaceRaised, borderColor: changed ? colors.accent : colors.outline }]}
       >
         <View style={styles.valueBlock}>
           {small && <Text style={[styles.smallLabel, { color: colors.inkMuted }]}>{label}</Text>}

@@ -19,7 +19,7 @@ type FieldProps = Pick<
 export function Field({ label, help, error, plainText = false, trailing, changed = false, ...input }: FieldProps) {
   const colors = useColors();
   const [focused, setFocused] = useState(false);
-  const borderColor = error ? colors.danger : focused || changed ? colors.accent : colors.line;
+  const borderColor = error ? colors.danger : focused || changed ? colors.accent : colors.outline;
   return (
     <View style={styles.field}>
       <FieldLabel label={label} changed={changed} />

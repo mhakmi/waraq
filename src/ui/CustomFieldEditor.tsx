@@ -86,13 +86,13 @@ function ToggleEditor({ field, draft, onChange, changed, removeButton }: EditorP
   return (
     <View style={styles.field}>
       <FieldLabel label={field.name} changed={changed} />
-      <View style={[styles.box, { backgroundColor: colors.surfaceRaised, borderColor: changed ? colors.accent : colors.line }]}>
+      <View style={[styles.box, { backgroundColor: colors.surfaceRaised, borderColor: changed ? colors.accent : colors.outline }]}>
         <Text style={[styles.toggleText, { color: colors.ink }]}>{draft.on ? copy.detail.fieldWords.yes : copy.detail.fieldWords.no}</Text>
         <Switch
           accessibilityLabel={field.name}
           value={draft.on}
           onValueChange={(on) => onChange({ ...draft, on })}
-          trackColor={{ true: colors.accent, false: colors.line }}
+          trackColor={{ true: colors.accent, false: colors.outline }}
           thumbColor={draft.on ? colors.onAccent : colors.inkMuted}
         />
         {removeButton}

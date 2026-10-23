@@ -347,7 +347,7 @@ function Notes({ document }: { document: DocumentDetail }) {
         </View>
       ))}
       {document.userCanChange && can('add', 'notes') && (
-        <View style={[styles.noteAdd, { backgroundColor: colors.surfaceRaised, borderColor: colors.line }]}>
+        <View style={[styles.noteAdd, { backgroundColor: colors.surfaceRaised, borderColor: colors.outline }]}>
           <TextInput
             value={text}
             onChangeText={setText}

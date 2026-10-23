@@ -294,7 +294,7 @@ function LabelSheet({ kind, item, onClose }: { kind: LabelKind; item: LabelItem 
             accessibilityLabel={copy.labels.inboxSwitch}
             value={draft.isInboxTag}
             onValueChange={(isInboxTag) => setDraft({ ...draft, isInboxTag })}
-            trackColor={{ true: colors.accent, false: colors.surfaceSunken }}
+            trackColor={{ true: colors.accent, false: colors.outline }}
             thumbColor={draft.isInboxTag ? colors.onAccent : colors.inkMuted}
           />
         </View>
