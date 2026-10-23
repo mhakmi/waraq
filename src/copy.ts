@@ -692,4 +692,27 @@ export const copy = {
       fix: 'Copy the connection report and include it when you ask for help.',
     }),
   },
+
+  customFields: {
+    add: 'Add a custom field',
+    remove: (name: string) => `Remove ${name}`,
+    currency: 'Currency',
+    amount: 'Amount',
+    addLink: (name: string) => `Link a document to ${name}`,
+    removeLink: (title: string) => `Remove the link to ${title}`,
+    linkedDocument: (id: number) => `Document ${id}`,
+    linkTitle: 'Link documents',
+    problems: {
+      tooLong: 'Keep it to 128 characters or fewer.',
+      notWholeNumber: 'Enter a whole number, or leave it empty.',
+      tooLarge: 'Enter a number between -2147483648 and 2147483647.',
+      notNumber: 'Enter a number such as 12.5, or leave it empty.',
+      notWebAddress: 'Enter a web address that starts with https://, or leave it empty.',
+      notAmount: 'Enter an amount such as 12.50, with at most two decimals.',
+      notCurrency: 'Enter a three-letter currency code such as CAD, or leave it empty.',
+    },
+    save: 'Set',
+    none: 'None',
+    removeFromBatch: 'Remove from the batch',
+  },
 };

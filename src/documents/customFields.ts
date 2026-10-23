@@ -119,7 +119,6 @@ export const fieldKinds = {
     write: (draft) => written(draft.optionId),
     show: (value, field) => field.selectOptions.find((option) => option.id === value)?.label ?? String(value),
   }),
-  // Paperless takes a currency code and an amount with up to two decimals, as in "EUR12.50".
   monetary: kind<Extract<Draft, { type: 'money' }>>({
     read: (value, field) => {
       if (value === null || value === '') {

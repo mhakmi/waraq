@@ -17,6 +17,7 @@ type PickerProps = {
   emptyChoice?: string;
   createLabel?: (name: string) => string;
   onCreate?: (name: string) => Promise<Named | null>;
+  onSearch?: (text: string) => void;
   onClose: () => void;
   onDone: (ids: number[]) => void;
 };
@@ -27,14 +28,14 @@ export function Picker(props: PickerProps) {
   return props.visible ? <OpenPicker {...props} /> : null;
 }
 
-function OpenPicker({ title, items, selected, multiple = false, emptyChoice, createLabel, onCreate, onClose, onDone }: PickerProps) {
+function OpenPicker({ title, items, selected, multiple = false, emptyChoice, createLabel, onCreate, onSearch, onClose, onDone }: PickerProps) {
   const colors = useColors();
   const [search, setSearch] = useState('');
   const [chosen, setChosen] = useState(selected);
   const [creating, setCreating] = useState(false);
 
   const typed = search.trim();
-  const matches = items.filter((item) => item.name.toLowerCase().includes(typed.toLowerCase()));
+  const matches = onSearch !== undefined ? items : items.filter((item) => item.name.toLowerCase().includes(typed.toLowerCase()));
   const exact = items.some((item) => item.name.toLowerCase() === typed.toLowerCase());
   const rows: Row[] = [
     ...(emptyChoice !== undefined && typed === '' ? [{ kind: 'empty' as const, label: emptyChoice }] : []),
@@ -110,7 +111,10 @@ function OpenPicker({ title, items, selected, multiple = false, emptyChoice, cre
           <Icon name="search" color={colors.inkMuted} />
           <TextInput
             value={search}
-            onChangeText={setSearch}
+            onChangeText={(text) => {
+              setSearch(text);
+              onSearch?.(text);
+            }}
             placeholder={copy.picker.search}
             placeholderTextColor={colors.inkMuted}
             accessibilityLabel={copy.picker.search}

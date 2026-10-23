@@ -6,20 +6,31 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { queryKeys } from '../../../src/cache/keys';
 import { copy } from '../../../src/copy';
-import { documentChanges, editableFields, type EditableFields, parseArchiveNumber } from '../../../src/documents/edit';
+import { showValue } from '../../../src/documents/customFields';
+import {
+  addedField,
+  type CustomFieldEdit,
+  customFieldChanges,
+  customFieldEdits,
+  documentChanges,
+  editableFields,
+  type EditableFields,
+  parseArchiveNumber,
+} from '../../../src/documents/edit';
 import { nameOf, useCreateLabel, useLabels } from '../../../src/labels';
-import type { DocumentDetail, DocumentId } from '../../../src/paperless/schemas';
+import type { CustomField, DocumentDetail, DocumentId } from '../../../src/paperless/schemas';
 import { RequestFailed, unwrap } from '../../../src/query';
 import { useClient, useSignedIn } from '../../../src/session';
 import { touchTarget, useColors } from '../../../src/theme';
 import { Button } from '../../../src/ui/Button';
 import { Chip } from '../../../src/ui/Chip';
+import { CustomFieldEditor } from '../../../src/ui/CustomFieldEditor';
 import { Field } from '../../../src/ui/Field';
 import { DateField, FieldBox, FieldLabel } from '../../../src/ui/FieldBox';
 import { Icon } from '../../../src/ui/Icon';
 import { Picker } from '../../../src/ui/Picker';
 
-type PickerOpen = null | 'correspondent' | 'documentType' | 'storagePath' | 'tags';
+type PickerOpen = null | 'correspondent' | 'documentType' | 'storagePath' | 'tags' | 'customField';
 
 function failureText(error: Error | null): string {
   if (error instanceof RequestFailed && error.failure.kind === 'rejected') {
@@ -38,21 +49,22 @@ export default function EditScreen() {
   const client = useClient();
   const { account } = useSignedIn();
   const id = Number(useLocalSearchParams<{ id: string }>().id) as DocumentId;
+  const customFields = useLabels().customFields;
   const detail = useQuery({
     queryKey: queryKeys.document(account.id, id),
     queryFn: () => unwrap(client.getDocument(id)),
   });
-  if (detail.data === undefined) {
+  if (detail.data === undefined || customFields.isPending) {
     return (
       <SafeAreaView style={[styles.fill, { backgroundColor: colors.surface }]}>
         <ActivityIndicator style={styles.loading} color={colors.accent} size="large" />
       </SafeAreaView>
     );
   }
-  return <EditForm document={detail.data} />;
+  return <EditForm document={detail.data} customFields={customFields.data ?? []} />;
 }
 
-function EditForm({ document }: { document: DocumentDetail }) {
+function EditForm({ document, customFields }: { document: DocumentDetail; customFields: CustomField[] }) {
   const colors = useColors();
   const client = useClient();
   const router = useRouter();
@@ -64,13 +76,23 @@ function EditForm({ document }: { document: DocumentDetail }) {
   const [draft, setDraft] = useState<EditableFields>(original);
   const [archiveText, setArchiveText] = useState(original.archiveSerialNumber === null ? '' : String(original.archiveSerialNumber));
   const [picker, setPicker] = useState<PickerOpen>(null);
+  const [customEdits, setCustomEdits] = useState<CustomFieldEdit[]>(() => customFieldEdits(document.customFields, customFields));
   const createLabel = useCreateLabel();
 
   const archive = parseArchiveNumber(archiveText);
   const fields = archive.ok ? { ...draft, archiveSerialNumber: archive.value } : draft;
-  const changes = documentChanges(original, fields);
-  const changeCount = Object.keys(changes).length;
+  const custom = customFieldChanges(document.customFields, customEdits, customFields);
+  const fieldChanges = documentChanges(original, fields);
+  const changes = custom.values === null ? fieldChanges : { ...fieldChanges, customFields: custom.values };
+  const changeCount = Object.keys(fieldChanges).length + custom.changed.size;
   const titleEmpty = draft.title.trim() === '';
+  const addable = customFields.filter(
+    (field) => addedField(field).draft !== null && !customEdits.some((edit) => edit.fieldId === field.id),
+  );
+
+  function changeCustomField(fieldId: number, next: CustomFieldEdit | null) {
+    setCustomEdits(customEdits.flatMap((edit) => (edit.fieldId !== fieldId ? [edit] : next === null ? [] : [next])));
+  }
 
   const save = useMutation({
     mutationFn: () => unwrap(client.updateDocument(document.id, changes)),
@@ -122,7 +144,7 @@ function EditForm({ document }: { document: DocumentDetail }) {
           label={copy.edit.save(changeCount)}
           compact
           busy={save.isPending}
-          disabled={changeCount === 0 || titleEmpty || !archive.ok}
+          disabled={changeCount === 0 || titleEmpty || !archive.ok || custom.problems.size > 0}
           onPress={() => save.mutate()}
         />
       </View>
@@ -202,6 +224,37 @@ function EditForm({ document }: { document: DocumentDetail }) {
           changed={'archiveSerialNumber' in changes}
           error={archive.ok ? null : copy.edit.archiveInvalid}
         />
+        {customEdits.map((edit) => {
+          const field = customFields.find((candidate) => candidate.id === edit.fieldId);
+          if (field === undefined) {
+            return null;
+          }
+          if (edit.draft === null) {
+            const value = document.customFields.find((entry) => entry.fieldId === edit.fieldId)?.value ?? null;
+            return (
+              <View key={edit.fieldId} style={styles.field}>
+                <FieldLabel label={field.name} />
+                <Text style={[styles.readOnly, { color: colors.ink }]}>{showValue(field, value, copy.locale, copy.detail.fieldWords) ?? copy.detail.notSet}</Text>
+              </View>
+            );
+          }
+          return (
+            <CustomFieldEditor
+              key={edit.fieldId}
+              field={field}
+              draft={edit.draft}
+              onChange={(next) => changeCustomField(edit.fieldId, { fieldId: edit.fieldId, draft: next })}
+              changed={custom.changed.has(edit.fieldId)}
+              problem={custom.problems.get(edit.fieldId) ?? null}
+              onRemove={() => changeCustomField(edit.fieldId, null)}
+            />
+          );
+        })}
+        {addable.length > 0 && (
+          <View style={styles.addField}>
+            <Button label={copy.customFields.add} icon="plus" variant="outline" onPress={() => setPicker('customField')} />
+          </View>
+        )}
       </ScrollView>
       {picker === 'tags' && (
         <Picker
@@ -240,6 +293,22 @@ function EditForm({ document }: { document: DocumentDetail }) {
           onDone={picked}
         />
       )}
+      {picker === 'customField' && (
+        <Picker
+          visible
+          title={copy.customFields.add}
+          items={addable}
+          selected={[]}
+          onClose={() => setPicker(null)}
+          onDone={(ids) => {
+            const field = addable.find((candidate) => candidate.id === ids[0]);
+            if (field !== undefined) {
+              setCustomEdits([...customEdits, addedField(field)]);
+            }
+            setPicker(null);
+          }}
+        />
+      )}
       {picker === 'storagePath' && (
         <Picker
           visible
@@ -267,4 +336,6 @@ const styles = StyleSheet.create({
   error: { fontSize: 14.5 },
   field: { gap: 6 },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  readOnly: { fontSize: 16, paddingBlock: 8 },
+  addField: { alignItems: 'flex-start' },
 });

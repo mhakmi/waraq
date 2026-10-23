@@ -6,7 +6,7 @@ import { FieldLabel } from './FieldBox';
 
 type FieldProps = Pick<
   TextInputProps,
-  'value' | 'onChangeText' | 'placeholder' | 'keyboardType' | 'autoComplete' | 'autoFocus' | 'secureTextEntry' | 'onSubmitEditing'
+  'value' | 'onChangeText' | 'placeholder' | 'keyboardType' | 'autoComplete' | 'autoFocus' | 'secureTextEntry' | 'onSubmitEditing' | 'multiline'
 > & {
   changed?: boolean;
   label: string;

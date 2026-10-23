@@ -83,6 +83,7 @@ export type DocumentOrderField =
   | 'page_count';
 
 export type DocumentQuery = {
+  ids?: number[];
   query?: string;
   tagIdsAll?: number[];
   tagIdsAny?: number[];
@@ -291,6 +292,7 @@ export function documentQueryParameters(query: DocumentQuery): Record<string, Qu
     ? `${query.orderBy.descending ? '-' : ''}${query.orderBy.field}`
     : undefined;
   const own: Record<string, QueryValue> = {
+    id__in: idList(query.ids),
     query: query.query,
     tags__id__all: idList(query.tagIdsAll),
     tags__id__in: idList(query.tagIdsAny),
