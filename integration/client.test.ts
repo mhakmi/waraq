@@ -2,6 +2,7 @@ import { beforeAll, describe, expect, test } from 'vitest';
 
 import { documentQuery, emptyFilter } from '../src/documents/filter';
 import { viewParameters, viewRules } from '../src/documents/views';
+import { documentsIn, loadDocumentsByInboxTag, removeInboxTags, restoreInboxTags } from '../src/inbox/doneAll';
 import { documentQueryParameters, obtainToken } from '../src/paperless/client';
 import type { DocumentId, IsoDate, SavedView } from '../src/paperless/schemas';
 import {
@@ -250,6 +251,54 @@ describe('editing', () => {
     expect(result).toEqual({ ok: true, value: null });
     const after = await client.getDocument(doomed);
     expect(after).toEqual({ ok: false, error: { kind: 'not_found' } });
+  });
+});
+
+describe('marking the whole inbox done', () => {
+  const marker = uniqueName('alldone').replace(/-/g, '');
+  let firstInbox: number;
+  let secondInbox: number;
+  let keptTag: number;
+  let both: DocumentId;
+  let onlyFirst: DocumentId;
+  let onlySecond: DocumentId;
+
+  beforeAll(async () => {
+    firstInbox = await createLabel('tags', uniqueName('inbox-a'));
+    secondInbox = await createLabel('tags', uniqueName('inbox-b'));
+    keptTag = await createLabel('tags', uniqueName('kept'));
+    both = await uploadAndWait(`${marker} both`, [firstInbox, secondInbox, keptTag], '2026-10-01' as IsoDate);
+    onlyFirst = await uploadAndWait(`${marker} first`, [firstInbox], '2026-10-02' as IsoDate);
+    onlySecond = await uploadAndWait(`${marker} second`, [secondInbox, keptTag], '2026-10-03' as IsoDate);
+  });
+
+  async function tagsOf(id: DocumentId): Promise<number[]> {
+    const result = await client.getDocument(id);
+    if (!result.ok) {
+      throw new Error(JSON.stringify(result.error));
+    }
+    return [...result.value.tagIds].sort((first, second) => first - second);
+  }
+
+  test('bulk edit takes the inbox tags off every document, and undo puts back only the ones each had', async () => {
+    const loaded = await loadDocumentsByInboxTag((tagId) => client.listDocumentIds({ tagIdsAll: [tagId] }), [firstInbox, secondInbox]);
+    if (!loaded.ok) {
+      throw new Error(JSON.stringify(loaded.error));
+    }
+    expect([...documentsIn(loaded.value)].sort()).toEqual([both, onlyFirst, onlySecond].sort());
+
+    const outcome = await removeInboxTags(client.changeTags, loaded.value, () => {});
+    expect(outcome.error).toBeNull();
+    expect(await tagsOf(both)).toEqual([keptTag]);
+    expect(await tagsOf(onlyFirst)).toEqual([]);
+    expect(await tagsOf(onlySecond)).toEqual([keptTag]);
+    const left = await client.listDocumentIds({ tagIdsAny: [firstInbox, secondInbox] });
+    expect(left).toEqual({ ok: true, value: [] });
+
+    expect(await restoreInboxTags(client.changeTags, loaded.value)).toEqual({ ok: true, value: null });
+    expect(await tagsOf(both)).toEqual([firstInbox, secondInbox, keptTag].sort((first, second) => first - second));
+    expect(await tagsOf(onlyFirst)).toEqual([firstInbox]);
+    expect(await tagsOf(onlySecond)).toEqual([secondInbox, keptTag].sort((first, second) => first - second));
   });
 });
 

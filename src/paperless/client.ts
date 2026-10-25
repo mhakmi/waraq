@@ -458,6 +458,21 @@ export function createPaperlessClient<File>(options: ClientOptions<File>) {
       });
     },
 
+    listDocumentIds(query: DocumentQuery) {
+      return listAll(connection, 'documents/', DocumentIdOnly, { ...documentQueryParameters(query), fields: 'id' });
+    },
+
+    changeTags(ids: DocumentId[], changes: { add: number[]; remove: number[] }) {
+      return requestJson(connection, 'documents/bulk_edit/', z.object({ result: z.string() }), {
+        method: 'POST',
+        body: JSON.stringify({
+          documents: ids,
+          method: 'modify_tags',
+          parameters: { add_tags: changes.add, remove_tags: changes.remove },
+        }),
+      });
+    },
+
     getDocument(id: DocumentId) {
       return requestJson(connection, `documents/${id}/`, DocumentDetail);
     },

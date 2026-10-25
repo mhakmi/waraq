@@ -1,17 +1,25 @@
 import { useInfiniteQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
-import type { ReactNode } from 'react';
-import { ActivityIndicator, RefreshControl, SectionList, StyleSheet, Text, View } from 'react-native';
+import { type ReactNode, useState } from 'react';
+import { ActivityIndicator, Alert, RefreshControl, SectionList, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { queryKeys } from '../../src/cache/keys';
 import { copy } from '../../src/copy';
 import { type DocumentPages, positionOf, tagsAfterDone, withDocumentAt, withoutDocument } from '../../src/inbox/done';
+import {
+  documentsIn,
+  type DocumentsByInboxTag,
+  loadDocumentsByInboxTag,
+  onlyFinished,
+  removeInboxTags,
+  restoreInboxTags,
+} from '../../src/inbox/doneAll';
 import { inboxSections, inboxTagIds } from '../../src/inbox/rows';
 import { readableItems, useLabels } from '../../src/labels';
 import { useCan } from '../../src/settings/usePermissions';
 import type { DocumentId, DocumentSummary } from '../../src/paperless/schemas';
-import { errorText, unwrap, useOnline } from '../../src/query';
+import { errorText, RequestFailed, unwrap, useOnline } from '../../src/query';
 import { type AppClient, useClient, useSignedIn } from '../../src/session';
 import { useColors } from '../../src/theme';
 import { AccountButton } from '../../src/ui/AccountButton';
@@ -85,6 +93,83 @@ function useMarkDone(client: AppClient, accountId: string, tagIds: number[]) {
   };
 }
 
+type AllDoneState =
+  | { kind: 'idle' }
+  | { kind: 'loading' }
+  | { kind: 'running'; finished: number; total: number }
+  | { kind: 'undoing' };
+
+function useMarkAllDone(client: AppClient, accountId: string, tagIds: number[]) {
+  const queryClient = useQueryClient();
+  const showSnackbar = useShowSnackbar();
+  const [state, setState] = useState<AllDoneState>({ kind: 'idle' });
+  const inboxKey = queryKeys.inbox(accountId, tagIds);
+
+  const refreshDocuments = () => {
+    queryClient.invalidateQueries({ queryKey: queryKeys.allDocumentLists(accountId) });
+    queryClient.invalidateQueries({ queryKey: queryKeys.allDocumentDetails(accountId) });
+  };
+
+  async function undo(members: DocumentsByInboxTag) {
+    setState({ kind: 'undoing' });
+    const result = await restoreInboxTags(client.changeTags, members);
+    setState({ kind: 'idle' });
+    refreshDocuments();
+    if (!result.ok) {
+      showSnackbar({ text: copy.inbox.allUndoFailed });
+    }
+  }
+
+  async function markDone(members: DocumentsByInboxTag) {
+    const total = documentsIn(members).length;
+    setState({ kind: 'running', finished: 0, total });
+    await queryClient.cancelQueries({ queryKey: inboxKey });
+    const outcome = await removeInboxTags(client.changeTags, members, (finished) =>
+      setState({ kind: 'running', finished, total }),
+    );
+    setState({ kind: 'idle' });
+    queryClient.setQueryData<DocumentPages>(inboxKey, (data) => outcome.finished.reduce(withoutDocument, data));
+    refreshDocuments();
+    const changed = onlyFinished(members, outcome.finished);
+    showSnackbar({
+      text: outcome.error === null ? copy.inbox.allMarked(total) : copy.inbox.allDoneFailed(outcome.finished.length, total),
+      action: changed.length > 0 ? { label: copy.inbox.undo, onPress: () => undo(changed) } : undefined,
+    });
+  }
+
+  async function start() {
+    setState({ kind: 'loading' });
+    const loaded = await loadDocumentsByInboxTag((tagId) => client.listDocumentIds({ tagIdsAll: [tagId] }), tagIds);
+    setState({ kind: 'idle' });
+    if (!loaded.ok) {
+      showSnackbar({ text: errorText(new RequestFailed(loaded.error)) });
+      return;
+    }
+    const count = documentsIn(loaded.value).length;
+    if (count === 0) {
+      refreshDocuments();
+      return;
+    }
+    Alert.alert(copy.inbox.allDoneTitle(count), copy.inbox.allDoneMessage, [
+      { text: copy.inbox.allDoneCancel, style: 'cancel' },
+      { text: copy.inbox.allDoneConfirm, onPress: () => markDone(loaded.value) },
+    ]);
+  }
+
+  return { state, start };
+}
+
+function subtitle(state: AllDoneState, count: number): string {
+  switch (state.kind) {
+    case 'running':
+      return copy.inbox.allDoneProgress(state.finished, state.total);
+    case 'undoing':
+      return copy.inbox.allDoneUndoing;
+    default:
+      return copy.inbox.newCount(count);
+  }
+}
+
 export default function InboxScreen() {
   const colors = useColors();
   const client = useClient();
@@ -95,6 +180,7 @@ export default function InboxScreen() {
   const tagIds = inboxTagIds(tags.data ?? []);
   const documents = useInboxDocuments(client, account.id, tagIds);
   const markDone = useMarkDone(client, account.id, tagIds);
+  const allDone = useMarkAllDone(client, account.id, tagIds);
   const mayChangeDocuments = useCan()('change', 'documents');
 
   const items = documents.data?.pages.flatMap((page) => page.items) ?? [];
@@ -131,9 +217,20 @@ export default function InboxScreen() {
             {copy.shell.inbox}
           </Text>
           {count !== undefined && (
-            <Text style={[styles.subtitle, { color: colors.inkMuted }]}>{copy.inbox.newCount(count)}</Text>
+            <Text style={[styles.subtitle, { color: colors.inkMuted }]}>{subtitle(allDone.state, count)}</Text>
           )}
         </View>
+        {mayChangeDocuments && count !== undefined && count > 0 && (
+          <Button
+            label={copy.inbox.allDone}
+            accessibilityLabel={copy.inbox.allDoneLabel(count)}
+            icon="check"
+            variant="outline"
+            compact
+            busy={allDone.state.kind !== 'idle'}
+            onPress={allDone.start}
+          />
+        )}
         <AccountButton />
       </View>
       {savedCopy && <SavedCopyLine />}

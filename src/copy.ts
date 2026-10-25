@@ -66,6 +66,20 @@ export const copy = {
     undo: 'Undo',
     doneFailed: (title: string) => `${title} is still in the inbox. Check your connection, then try again.`,
     undoFailed: (title: string) => `${title} could not go back to the inbox. Check your connection, then try again.`,
+    allDone: 'All done',
+    allDoneLabel: (count: number) => (count === 1 ? 'Mark the 1 inbox document done' : `Mark all ${count} inbox documents done`),
+    allDoneTitle: (count: number) => (count === 1 ? 'Mark 1 document done?' : `Mark all ${count} documents done?`),
+    allDoneMessage: 'This removes the inbox tag from every document in the inbox.',
+    allDoneConfirm: 'Mark done',
+    allDoneCancel: 'Cancel',
+    allDoneProgress: (finished: number, total: number) => `Marking done, ${finished} of ${total}`,
+    allDoneUndoing: 'Putting them back in the inbox',
+    allMarked: (count: number) => (count === 1 ? 'Marked 1 done. Inbox tag removed.' : `Marked ${count} done. Inbox tag removed.`),
+    allDoneFailed: (finished: number, total: number) =>
+      finished === 0
+        ? 'The inbox did not change. Check your connection, then try again.'
+        : `Marked ${finished} of ${total} done. Check your connection, then try again.`,
+    allUndoFailed: 'Some documents could not go back to the inbox. Check your connection, then try again.',
   },
 
   documents: {
