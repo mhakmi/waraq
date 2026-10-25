@@ -81,8 +81,8 @@ export default function TabsLayout() {
     <SnackbarProvider value={snackbar.show}>
       <View style={styles.fill}>
         <Tabs tabBar={(props) => <TabBar {...props} />} screenOptions={{ headerShown: false }}>
-          <Tabs.Screen name="index" options={{ title: copy.shell.inbox }} />
-          <Tabs.Screen name="documents" options={{ title: copy.shell.documents }} />
+          <Tabs.Screen name="index" options={{ title: copy.shell.documents }} />
+          <Tabs.Screen name="inbox" options={{ title: copy.shell.inbox }} />
           <Tabs.Screen
             name="uploads"
             options={{

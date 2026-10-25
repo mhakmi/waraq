@@ -81,7 +81,7 @@ flowchart TD
 	Settings --> Labels["Labels"]
 ```
 
-**Direction A, three tabs.** A bottom bar holds Inbox, Documents, and Uploads, with a large Scan button above it. Inbox is the start screen. It suits people who file their documents every day.
+**Direction A, three tabs.** A bottom bar holds Documents, Inbox, and Uploads, with a large Scan button above it. Documents is the start screen; the owner moved it first in 0.3.1 after using the app daily.
 
 **Direction B, one home.** No bottom bar. The home screen is Documents, with "Inbox | All" at the top. A wide Scan button sits at the bottom. A slim strip under the top bar shows uploads in flight and opens the queue. It has fewer places to learn, and the queue is out of sight when it is empty.
 
@@ -488,7 +488,7 @@ The upload queue has the same shape in both apps, but the servers differ. Daftar
 The owner answered the open questions on 2026-10-17.
 
 1. **Name.** Waraq, with the package `dev.mhakmi.waraq`.
-2. **Layout.** Direction A: Inbox, Documents, and Uploads tabs, with a Scan button above the bar. Inbox is the start screen.
+2. **Layout.** Direction A: Documents, Inbox, and Uploads tabs, with a Scan button above the bar. Documents is the start screen (since 0.3.1).
 3. **Batch details.** Direction A: shared fields first, then one card per document.
 4. **HTTP servers.** Allowed for private addresses only (home network ranges, `.local`, and Tailscale's `100.64.0.0/10`), with a warning that suggests HTTPS. Refused for public addresses.
 5. **Demo server for Play review.** Yes. The owner sets it up when the Play account exists and his own testing is done, before the app is submitted.

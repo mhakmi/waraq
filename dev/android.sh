@@ -468,6 +468,8 @@ sign_in() {
 see_inbox() {
   local run=$1
   sign_in "$run" waraq-dev-password
+  wait_for "Search documents" 30
+  tap_by_description "Inbox"
   wait_for "Interest income slip" 30
   shot "$run-3-inbox"
   scroll_to "School trip permission letter"
@@ -1256,7 +1258,7 @@ background_send() {
   sleep 2
   shot "$run-3-uploads-dark"
   reset_display
-  # A font scale change restarts the activity on the Inbox tab.
+  # A font scale change restarts the activity on the Documents tab.
   adb shell settings put system font_scale 1.3
   wait_for "Scan" 30
   open_uploads_tab
@@ -1528,7 +1530,7 @@ fields_screens() {
   local run=$1
   adb shell am force-stop "$APP_ID"
   adb shell monkey -p "$APP_ID" -c android.intent.category.LAUNCHER 1 > /dev/null 2>&1
-  wait_for "Interest income slip" 30
+  wait_for "Search documents" 30
   open_september_bill "$run"
   scroll_to "Flow string"
   shot "$run-3-document-fields"

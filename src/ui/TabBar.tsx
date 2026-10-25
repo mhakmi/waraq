@@ -7,8 +7,8 @@ import { Icon, type IconName } from './Icon';
 export const tabBarHeight = 80;
 
 const tabIcons: Record<string, IconName> = {
-  index: 'inbox',
-  documents: 'documents',
+  index: 'documents',
+  inbox: 'inbox',
   uploads: 'upload',
 };
 

@@ -6,7 +6,7 @@ Waraq needs Paperless-ngx 3.0 or newer. It talks to the REST API at version 10.
 
 ## Code layout
 
-- `app/` holds the screens, one file per route, for expo-router. `(tabs)/` is Inbox, Documents, and Uploads. `sign-in/` is shown only while no account is stored.
+- `app/` holds the screens, one file per route, for expo-router. `(tabs)/` is Documents, Inbox, and Uploads, and Documents is `index.tsx`, the screen the app opens on. `sign-in/` is shown only while no account is stored.
 - `src/paperless/` is the API client. It uses the `fetch` it is given, and parses every response with Zod before the rest of the app sees it. Zod is the one dependency added for that.
 - `src/signin/` holds the sign-in steps and the checklist that a failed sign-in shows. It is plain TypeScript, so the tests run it in Node.
 - `src/account/` stores the one account. The address, user, and server version go in SQLite. The token and the custom header values go in the Android Keystore through expo-secure-store. The account's id is a hash of the server address and the username, so signing in again to the same server as the same user gives the same id, and the uploads held for that account carry on.
