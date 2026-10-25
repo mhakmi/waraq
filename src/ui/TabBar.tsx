@@ -41,7 +41,8 @@ export function TabBar({ state, descriptors, emitter, navigateToTab, insets }: B
             onPress={onPress}
             style={styles.item}
           >
-            <View style={[styles.pill, focused && { backgroundColor: colors.accentSoft }]}>
+            {/* Without a background the pill has no Android view of its own. The view made for it again on the next visit showed square corners. */}
+            <View collapsable={false} style={[styles.pill, focused && { backgroundColor: colors.accentSoft }]}>
               <Icon name={tabIcons[route.name]} color={focused ? colors.onAccentSoft : colors.inkMuted} />
               {options.tabBarBadge !== undefined && (
                 <View style={[styles.count, { backgroundColor: colors.accent }]}>
