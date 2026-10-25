@@ -85,6 +85,7 @@ dev/android.sh scan        # the scan flow, described below
 dev/android.sh settings    # the settings flow, on a build made with WARAQ_CRASH_TEST=1
 dev/android.sh fields      # custom fields, a saved view, and a note against the same server, described below
 dev/android.sh pdf-check   # the PDF writer's checks on the emulator, then its 10-page PDF opened on the Mac
+dev/android.sh batch-perf  # frame times on the batch screens with 12 documents, described below
 dev/android.sh logs
 dev/android.sh adb devices # any adb command, against port 5038
 dev/android.sh stop        # this emulator and its adb server only
@@ -107,6 +108,8 @@ The APK asks for `INTERNET`, `ACCESS_NETWORK_STATE`, `ACCESS_WIFI_STATE`, `WAKE_
 `dev/android.sh settings` needs an APK built with `WARAQ_CRASH_TEST=1 dev/android.sh build`, and it stops with that hint otherwise. It makes the user `flow-viewer` on the dev server, who may only view documents, tags, and notes. It signs in as admin, opens Settings, and switches the theme. It makes the tag "Flow tag" with a color and the inbox flag, renames it, and deletes it. It makes the select field "Flow field" with two choices and deletes it. It opens what the account can do, opens the crash test link, and checks that the crash report holds both test errors before it opens the share sheet. Then it shows the Settings screens in dark mode and at font scale 1.3, signs out, and signs in as `flow-viewer` to see a Settings with only the Tags row and a shorter list of permissions. At the end it deletes the user and any label it made.
 
 `dev/android.sh fields` makes one custom field of each type on the dev server, all named `Flow` and the type. It opens the September bill, sets a value of each type on the edit page, saves, and asks the server what it stored. It reopens the edit page, adds a note and deletes it, saves the search for "hydro" as the view "Flow view", and sets a custom field on a shared PDF in batch details, first for every document and then for that one document. Then it shows the document page, the edit page, and the filter sheet again in dark mode and at font scale 1.3. At the end it deletes the fields, the view, and the note.
+
+`dev/android.sh batch-perf` signs in, shares 17 pictures of A4 at 300 dpi into Waraq, and moves 5 of them into document 1, for a batch of 12 documents with one of 6 pages. It then reads `dumpsys gfxinfo` while it scrolls the batch screen, the page editor, and batch details, and while it types a title. It scrolls the inbox first, as a list to compare with, and notes the load on the Mac, since the emulator's frame times follow it. The numbers go to `.dev-data/perf/<name>.txt`.
 
 ## How the document screens get their data
 

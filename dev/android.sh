@@ -14,6 +14,7 @@
 #   dev/android.sh upload        scan and upload three documents, then one killed mid-send, then one sent by the background task
 #   dev/android.sh settings      theme, labels, permissions as admin and as a limited user, and the crash log, then dark and large text
 #   dev/android.sh fields        set a custom field of each type, save a view, add and delete a note, then the same screens in dark and large text
+#   dev/android.sh batch-perf [name]  build a batch of 12 documents and save frame times while scrolling and typing
 #   dev/android.sh pdf-check     run the PDF writer's checks on the emulator, then open its 10-page PDF on the Mac
 #   dev/android.sh check <name>  check the current screen's touch targets and labels with dev/screen-check.ts
 #   dev/android.sh talkback on|off  turn TalkBack on or off
@@ -1593,6 +1594,120 @@ pdf_check() {
   echo "$result" | grep -q '^OK '
 }
 
+share_image() {
+  local file=$1 name media_id
+  name=$(basename "$file")
+  adb push "$file" "/sdcard/Download/$name" > /dev/null
+  adb shell am broadcast -a android.intent.action.MEDIA_SCANNER_SCAN_FILE -d "file:///sdcard/Download/$name" > /dev/null
+  sleep 1
+  media_id=$(adb shell content query --uri content://media/external/file --projection _id \
+    --where "\"_display_name='$name'\"" | sed -nE 's/.*_id=([0-9]+).*/\1/p' | head -1)
+  adb shell am start -a android.intent.action.SEND -t image/jpeg \
+    -d "content://media/external/file/$media_id" --eu android.intent.extra.STREAM "content://media/external/file/$media_id" \
+    --grant-read-uri-permission -n "$APP_ID/.MainActivity" > /dev/null
+}
+
+frame_stats() {
+  adb shell dumpsys gfxinfo "$APP_ID" | tr -d '\r' \
+    | grep -m 6 -E '^(Total frames rendered|Janky frames|50th percentile|90th percentile|95th percentile|99th percentile):'
+}
+
+# Resets the frame counters, runs the rest of the arguments, and prints the frame times they drew.
+measure_frames() {
+  local name=$1
+  shift
+  adb shell dumpsys gfxinfo "$APP_ID" reset > /dev/null
+  "$@"
+  sleep 2
+  echo "== $name"
+  frame_stats
+}
+
+scroll_down_and_up() {
+  local swipe
+  for swipe in 1 2 3 4; do
+    adb shell input swipe 540 1700 540 700 300
+  done
+  for swipe in 1 2 3 4; do
+    adb shell input swipe 540 700 540 1700 300
+  done
+}
+
+type_title() {
+  tap "Title" android.widget.EditText
+  sleep 1
+  adb shell input text "abcdefghijklmnopqrstuvwxyz"
+}
+
+# Moves the only page of document 2 to the end of document 1, which holds $1 pages so far.
+move_into_first() {
+  local pages=$1 label
+  label=$([ "$pages" = 1 ] && echo "1 page" || echo "$pages pages")
+  tap "Edit pages of document 2"
+  wait_for "Menu for page 1" 10
+  tap "Menu for page 1"
+  wait_for "Move to another document" 5
+  tap "Move to another document"
+  wait_for "Document 1 · $label" 5
+  tap "Document 1 · $label"
+  wait_for "Review and upload $(( 17 - pages )) documents" 10
+}
+
+# Shares 17 pictures of A4 at 300 dpi, each becoming a document, and moves 5 of them into
+# document 1, for a batch of 12 documents with one of 6 pages. Then it measures frame times
+# on the batch screens while scrolling and while typing a title.
+batch_perf() {
+  local run=${1:-batch-perf} page=$DATA/perf-page.jpg number out
+  trap 'reset_display; adb shell rm -f "/sdcard/Download/page-*.jpg"' EXIT
+  reset_display
+  mkdir -p "$DATA/perf"
+  out=$DATA/perf/$run.txt
+  sips -z 3508 2480 -s format jpeg -s formatOptions 85 "$POSTER" --out "$page" > /dev/null
+  adb shell pm clear "$APP_ID" > /dev/null
+  see_inbox "$run-signin"
+  {
+    # Frame times on the emulator follow the load on the Mac, so the run notes it, and the inbox gives a list to compare with.
+    echo "Mac load averages: $(sysctl -n vm.loadavg)"
+    measure_frames "inbox, scrolling, for comparison" scroll_down_and_up
+  } | tee "$out"
+  for number in $(seq 1 17); do
+    cp "$page" "$DATA/perf/page-$number.jpg"
+    share_image "$DATA/perf/page-$number.jpg"
+    if [ "$number" = 1 ]; then
+      wait_for "Review and upload" 20
+    else
+      wait_for "Review and upload $number documents" 20
+    fi
+  done
+  scroll_to_top
+  for number in $(seq 1 5); do
+    move_into_first "$number"
+  done
+  wait_for "Review and upload 12 documents" 10
+  sleep 2
+  shot "$run-batch"
+  {
+    echo "Mac load averages: $(sysctl -n vm.loadavg)"
+    measure_frames "batch screen, scrolling" scroll_down_and_up
+    scroll_to_top
+    tap "Edit pages of document 1"
+    wait_for "6 pages" 10
+    sleep 1
+    measure_frames "page editor, scrolling" scroll_down_and_up
+    tap "Done"
+    wait_for "Document 1" 10
+    tap "Review and upload 12 documents"
+    wait_for "For every document" 10
+    sleep 2
+    measure_frames "batch details, scrolling" scroll_down_and_up
+    scroll_to_top
+    measure_frames "batch details, typing 26 letters into a title" type_title
+  } | tee -a "$out"
+  shot "$run-details-typed"
+  adb shell rm -f "/sdcard/Download/page-*.jpg"
+  echo "frame times in $out"
+}
+
 logs() {
   adb logcat -d -v time | grep -E "ReactNativeJS|AndroidRuntime|$APP_ID" || true
 }
@@ -1616,6 +1731,10 @@ case "${1:-}" in
   boot | install | flow | scan | upload | settings | fields | logs | stop)
     require_claim
     "$1"
+    ;;
+  batch-perf)
+    require_claim
+    batch_perf "${2:-}"
     ;;
   pdf-check)
     require_claim
