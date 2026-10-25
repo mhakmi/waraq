@@ -32,7 +32,7 @@ export function PageThumb({ uri, width, height, rotation, maxHeight, maxWidth = 
     >
       <Image
         source={{ uri }}
-        contentFit="fill"
+        contentFit="contain"
         style={{ width: imageWidth, height: imageHeight, transform: [{ rotate: `${rotation}deg` }] }}
       />
     </View>
