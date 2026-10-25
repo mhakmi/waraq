@@ -9,6 +9,7 @@ import {
   type CustomFieldValue,
   DocumentDetail,
   DocumentId,
+  DocumentIdAndChange,
   DocumentIdOnly,
   DocumentPermissions,
   DocumentSummary,
@@ -458,8 +459,13 @@ export function createPaperlessClient<File>(options: ClientOptions<File>) {
       });
     },
 
-    listDocumentIds(query: DocumentQuery) {
-      return listAll(connection, 'documents/', DocumentIdOnly, { ...documentQueryParameters(query), fields: 'id' });
+    // bulk_edit refuses the whole request when one document in it may not be changed, so those are left out.
+    async listChangeableDocumentIds(query: DocumentQuery): Promise<Result<DocumentId[]>> {
+      const listed = await listAll(connection, 'documents/', DocumentIdAndChange, {
+        ...documentQueryParameters(query),
+        fields: 'id,user_can_change',
+      });
+      return listed.ok ? success(listed.value.filter((document) => document.user_can_change).map((document) => document.id)) : listed;
     },
 
     changeTags(ids: DocumentId[], changes: { add: number[]; remove: number[] }) {

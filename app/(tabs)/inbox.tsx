@@ -1,6 +1,6 @@
 import { useInfiniteQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
-import { type ReactNode, useState } from 'react';
+import { type ReactNode, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, RefreshControl, SectionList, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -103,6 +103,7 @@ function useMarkAllDone(client: AppClient, accountId: string, tagIds: number[]) 
   const queryClient = useQueryClient();
   const showSnackbar = useShowSnackbar();
   const [state, setState] = useState<AllDoneState>({ kind: 'idle' });
+  const busy = useRef(false);
   const inboxKey = queryKeys.inbox(accountId, tagIds);
 
   const refreshDocuments = () => {
@@ -138,8 +139,20 @@ function useMarkAllDone(client: AppClient, accountId: string, tagIds: number[]) 
   }
 
   async function start() {
+    if (busy.current) {
+      return;
+    }
+    busy.current = true;
+    try {
+      await confirmAndMark();
+    } finally {
+      busy.current = false;
+    }
+  }
+
+  async function confirmAndMark() {
     setState({ kind: 'loading' });
-    const loaded = await loadDocumentsByInboxTag((tagId) => client.listDocumentIds({ tagIdsAll: [tagId] }), tagIds);
+    const loaded = await loadDocumentsByInboxTag((tagId) => client.listChangeableDocumentIds({ tagIdsAll: [tagId] }), tagIds);
     setState({ kind: 'idle' });
     if (!loaded.ok) {
       showSnackbar({ text: errorText(new RequestFailed(loaded.error)) });
@@ -150,10 +163,20 @@ function useMarkAllDone(client: AppClient, accountId: string, tagIds: number[]) 
       refreshDocuments();
       return;
     }
-    Alert.alert(copy.inbox.allDoneTitle(count), copy.inbox.allDoneMessage, [
-      { text: copy.inbox.allDoneCancel, style: 'cancel' },
-      { text: copy.inbox.allDoneConfirm, onPress: () => markDone(loaded.value) },
-    ]);
+    const confirmed = await new Promise<boolean>((resolve) =>
+      Alert.alert(
+        copy.inbox.allDoneTitle(count),
+        copy.inbox.allDoneMessage,
+        [
+          { text: copy.inbox.allDoneCancel, style: 'cancel', onPress: () => resolve(false) },
+          { text: copy.inbox.allDoneConfirm, onPress: () => resolve(true) },
+        ],
+        { onDismiss: () => resolve(false) },
+      ),
+    );
+    if (confirmed) {
+      await markDone(loaded.value);
+    }
   }
 
   return { state, start };

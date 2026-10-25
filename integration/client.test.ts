@@ -281,7 +281,7 @@ describe('marking the whole inbox done', () => {
   }
 
   test('bulk edit takes the inbox tags off every document, and undo puts back only the ones each had', async () => {
-    const loaded = await loadDocumentsByInboxTag((tagId) => client.listDocumentIds({ tagIdsAll: [tagId] }), [firstInbox, secondInbox]);
+    const loaded = await loadDocumentsByInboxTag((tagId) => client.listChangeableDocumentIds({ tagIdsAll: [tagId] }), [firstInbox, secondInbox]);
     if (!loaded.ok) {
       throw new Error(JSON.stringify(loaded.error));
     }
@@ -292,7 +292,7 @@ describe('marking the whole inbox done', () => {
     expect(await tagsOf(both)).toEqual([keptTag]);
     expect(await tagsOf(onlyFirst)).toEqual([]);
     expect(await tagsOf(onlySecond)).toEqual([keptTag]);
-    const left = await client.listDocumentIds({ tagIdsAny: [firstInbox, secondInbox] });
+    const left = await client.listChangeableDocumentIds({ tagIdsAny: [firstInbox, secondInbox] });
     expect(left).toEqual({ ok: true, value: [] });
 
     expect(await restoreInboxTags(client.changeTags, loaded.value)).toEqual({ ok: true, value: null });

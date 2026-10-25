@@ -124,6 +124,8 @@ export const ChangedDocument = z
 
 export const DocumentIdOnly = z.object({ id: DocumentId }).transform((document) => document.id);
 
+export const DocumentIdAndChange = z.object({ id: DocumentId, user_can_change: z.boolean().default(true) });
+
 export const Note = z
   .object({
     id: z.number().int(),
