@@ -41,7 +41,7 @@ If the key is lost after the first upload, you can ask Play to reset it in Play 
 
 **Checked** on 28 October 2026. `dev/android.sh bundle` built `.dev-data/bundles/waraq-0.3.1-4.aab`, 74 MB, from main at `be00b08`. `keytool -printcert` shows it is signed by `CN=Mohammed Hakmi, C=CA`, with the fingerprint above. The script printed no "NOT FOR UPLOAD" banner, and `dev/release-check.sh` passed every check.
 
-That bundle does not have the Paper loop icon yet, because the icon is wired in a separate branch. Build the bundle for the first upload after that branch is merged. The script wrote versionCode 4 to `.dev-data/last-version-code`, so it builds versionCode 4 again only with the reuse flag:
+That bundle has neither the Paper loop icon nor the Privacy policy row in Settings. The icon is on main now. Build the bundle for the first upload, and for the closed test, only after the Privacy policy row is on main too. The script wrote versionCode 4 to `.dev-data/last-version-code`, so it builds versionCode 4 again only with the reuse flag:
 
 ```sh
 dev/android.sh bundle --reuse-version-code
@@ -159,8 +159,10 @@ Declare these data types. Mark each one **Collected: Yes**, **Shared: No**, and 
 | Personal info > User IDs | Required | App functionality, Account management | The username sent to the user's server at sign-in. [Releasing Waraq](release.md) leaves it out. Declare it, because the username leaves the phone. **Inferred.** |
 | App info and performance > Diagnostics | Optional | Analytics | ML Kit's diagnostics to Google, only when the user scans. **Inferred** from Google's ML Kit page. |
 | Device or other IDs | Optional | Analytics | ML Kit's per-installation identifier. **Inferred**, as above. |
+| App activity > In-app search history | Optional | App functionality | The search terms sent to the user's server. **Inferred.** |
+| Personal info > Email address | Optional | App functionality, Account management | A username can be an email address, and it goes to the user's server at sign-in. **Inferred.** |
 
-**Not shared.** Each transfer goes to the user's own server because the user asked for it. **Inferred.**
+**Not shared.** Each transfer goes to the user's own server because the user asked for it. ML Kit's data goes to Google as a service provider that processes it for the app, which the form does not count as sharing. **Inferred.**
 
 **Not declared.** The crash log leaves the phone only when the user picks an app in the share sheet. Waraq receives nothing, so it is not collected. **Inferred.** The password goes to the user's server once and is not stored. Declare it only if Play's form asks about passwords under User IDs. **Inferred.**
 
@@ -173,7 +175,7 @@ Answers for the IARC questionnaire in **App content > Content rating**. **Inferr
 | Category | All other app types, or Utility, Productivity, Communication, or Other, whichever the form offers |
 | Violence, fear, sexuality, crude humor, language, drugs, alcohol, tobacco | No |
 | Gambling, simulated gambling, or real-money purchases | No |
-| Does the app let users interact or exchange content with each other? | No. Documents and notes stay on the user's own server. Waraq shows no other user's content in public. |
+| Does the app let users interact or exchange content with each other? | No. Users share nothing through Waraq. It shows only what their own server returns. |
 | Does the app share the user's current physical location with other users? | No |
 | Does the app allow users to buy digital goods? | No |
 | Is the app a web browser or search engine? | No |
@@ -264,14 +266,15 @@ Google asks for 12 testers who have been opted in for the last 14 days in a row.
 
 ## 9. What only you can do, in order
 
-1. Back up `waraq-upload.jks` and save its password in your password manager.
-2. Read and approve the listing text, the feature graphic, the screenshots, and the privacy policy on this page.
-3. Ask the site thread to publish [privacy.md](privacy.md) at `https://mhakmi.dev/waraq/privacy`, and ask for a Privacy policy row in Settings.
-4. Make the personal Play developer account: US$25, ID, and a verified Android phone.
+1. Make the personal Play developer account: US$25, ID, and a verified Android phone. Do this first, because the identity check takes days. Play also verifies the contact email address and phone number.
+2. Back up `waraq-upload.jks` and save its password in your password manager.
+3. Read and approve the listing text, the feature graphic, the screenshots, and the privacy policy on this page.
+4. Ask the site thread to publish [privacy.md](privacy.md) at `https://mhakmi.dev/waraq/privacy`.
 5. Set up the demo server, with your go-ahead for the deploy and the DNS record.
 6. Create the app in Play Console with the package `dev.mhakmi.waraq`. This registers the package name for good.
-7. Fill in the App content forms from sections 4 to 6, and the store listing from sections 2 and 3.
-8. Upload the first bundle to the internal test track, install it from Play on your phone, and sign in to your own server.
-9. Make the Google Group and find at least 12 testers. Recruit 15.
-10. Start the closed test and send the testers the message above.
-11. After 14 days with 12 or more testers, apply for production.
+7. Fill in the App content forms from sections 4 to 7, after the demo server works from the app, and the store listing from sections 2 and 3.
+8. Build the bundle with the new icon and the Privacy policy row. The orchestrator builds it with `dev/android.sh bundle`.
+9. Upload that bundle to the internal test track, install it from Play on your phone, and sign in to your own server.
+10. Make the Google Group and find at least 12 testers. Recruit 15.
+11. Start the closed test and send the testers the message above.
+12. After 14 days with 12 or more testers, apply for production.

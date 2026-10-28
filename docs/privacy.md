@@ -4,7 +4,7 @@ Last updated: 28 October 2026
 
 Waraq is an Android app for Paperless-ngx servers that you run yourself. Mohammed Hakmi makes Waraq. It is an independent app, and it is not made by or affiliated with the Paperless-ngx project.
 
-Waraq has no server of its own. It talks only to the Paperless-ngx server whose address you type in. It has no analytics, no ads, and no crash reporting service.
+Waraq has no server of its own. It talks only to the Paperless-ngx server whose address you type in. Waraq adds no analytics, no ads, and no crash reporting service of its own.
 
 ## What Waraq keeps on your phone
 
@@ -18,7 +18,7 @@ Android's backup is turned off for Waraq, so none of this goes into your Google 
 
 ## What Waraq sends, and where
 
-Waraq sends data only to your own Paperless-ngx server:
+Waraq sends data only to your own Paperless-ngx server, and through any proxy you put in front of it:
 
 - your username and password or API token, to sign in,
 - requests to list, search, open, and edit your documents, notes, labels, and saved views,
@@ -41,7 +41,7 @@ Waraq asks for network access, to reach your server, and for permission to keep 
 ## How to delete your data
 
 - To delete documents, delete them on your Paperless-ngx server. Waraq can delete them there for you.
-- To remove your account from the phone, open **Settings** and tap **Sign out**. Waraq deletes your account details, your token, the saved document lists and details, your recent searches, and the scan you were working on.
+- To remove your account from the phone, open **Settings** and tap **Sign out**. Waraq deletes your account details, your token, the saved document lists and details, your recent searches, and the scan you were working on. Uploads that have not finished stay on the phone until you sign in to that account again, or until you uninstall Waraq.
 - To remove everything Waraq keeps on the phone, including the crash log, thumbnails, and opened documents, uninstall Waraq or clear its storage in Android's app settings.
 
 Waraq creates no account of its own, so there is no account with the maker to delete.
