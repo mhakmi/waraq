@@ -177,6 +177,8 @@ A build made with `WARAQ_CRASH_TEST=1` has a screen at `waraq://settings/crash-t
 
 ## Licenses
 
+Waraq is under the MIT license, in [LICENSE](LICENSE).
+
 `bun run licenses` walks the packages that `dependencies` in `package.json` pull in, reads each one's license, and writes `src/settings/licenses.json`, which the licenses screen shows. Rerun it before each release. The list includes Expo's build tools, which do not ship in the app, and it leaves out the Android libraries that Gradle adds, such as ML Kit.
 
 ## How a scan becomes a batch
