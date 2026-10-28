@@ -1764,7 +1764,7 @@ case "${1:-}" in
   adb)
     require_claim
     shift
-    adb_server "$@"
+    adb "$@"
     ;;
   fn)
     require_claim
