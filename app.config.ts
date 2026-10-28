@@ -9,9 +9,15 @@ const config: ExpoConfig = {
   version: '0.3.1',
   orientation: 'portrait',
   userInterfaceStyle: 'automatic',
+  icon: './assets/icon/launcher-192.png',
   android: {
     package: brand.androidPackage,
     versionCode: 4,
+    adaptiveIcon: {
+      foregroundImage: './assets/icon/adaptive-foreground-1024.png',
+      monochromeImage: './assets/icon/adaptive-monochrome-1024.png',
+      backgroundColor: '#1f3b6e',
+    },
     allowBackup: false,
     blockedPermissions: [
       'android.permission.READ_EXTERNAL_STORAGE',
