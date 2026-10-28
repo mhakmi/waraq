@@ -391,6 +391,8 @@ export const copy = {
     permissions: 'What your account can do',
     crashReport: 'Send a crash report',
     licenses: 'Open-source licenses',
+    privacy: 'Privacy policy',
+    sourceCode: 'Source code',
     about: 'About',
     aboutText: (version: string) =>
       `${brand.displayName} ${version}. ${brand.displayName} is an independent client for Paperless-ngx. It is not made by or affiliated with the Paperless-ngx project.`,

@@ -41,6 +41,8 @@ const shapes = {
   files: '<path d="M8 3h7l4 4v11a1 1 0 0 1-1 1H8a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z"/><path d="M15 3v4h4M4 7v13a1 1 0 0 0 1 1h10"/>',
   bug: '<rect x="7" y="8" width="10" height="12" rx="5"/><path d="M12 11v9M4 14h3M17 14h3M5 9l2.5 1.5M19 9l-2.5 1.5M9 5l1.5 2.5M15 5l-1.5 2.5"/>',
   signOut: '<path d="M14 4h5v16h-5M10 8l4 4-4 4M14 12H3"/>',
+  lock: '<rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/><circle cx="12" cy="16" r="1" fill="currentColor"/>',
+  code: '<path d="m8 8-4 4 4 4M16 8l4 4-4 4M14 5l-4 14"/>',
   mark: '<path d="M7 3h8l4 4v12a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z"/><path d="M15 3v4h4M8.5 12h7M8.5 16h5"/>',
 };
 

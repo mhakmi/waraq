@@ -1,6 +1,6 @@
 import Constants from 'expo-constants';
 import { useRouter } from 'expo-router';
-import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Alert, Linking, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { copy } from '../../src/copy';
@@ -17,6 +17,9 @@ import { Button } from '../../src/ui/Button';
 import { Icon } from '../../src/ui/Icon';
 import { useUploadQueue } from '../../src/upload/queue';
 import { unfinishedCount } from '../../src/upload/rows';
+
+const privacyUrl = 'https://mhakmi.dev/waraq/privacy';
+const sourceUrl = 'https://github.com/mhakmi/waraq';
 
 export default function SettingsScreen() {
   const colors = useColors();
@@ -58,6 +61,8 @@ export default function SettingsScreen() {
           <Row icon="shield" label={copy.settings.permissions} divided={false} onPress={() => router.push('/settings/permissions')} />
           <Row icon="bug" label={copy.settings.crashReport} divided onPress={() => router.push('/settings/crash-log')} />
           <Row icon="files" label={copy.settings.licenses} divided onPress={() => router.push('/settings/licenses')} />
+          <Row icon="lock" label={copy.settings.privacy} divided onPress={() => Linking.openURL(privacyUrl)} />
+          <Row icon="code" label={copy.settings.sourceCode} divided onPress={() => Linking.openURL(sourceUrl)} />
           <View style={[styles.about, { borderTopColor: colors.line }]}>
             <View style={styles.aboutHead}>
               <Icon name="info" color={colors.ink} />
