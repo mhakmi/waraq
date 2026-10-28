@@ -39,15 +39,9 @@ If the key is lost after the first upload, you can ask Play to reset it in Play 
 
 ### The first signed bundle
 
-**Checked** on 28 October 2026. `dev/android.sh bundle` built `.dev-data/bundles/waraq-0.3.1-4.aab`, 74 MB, from main at `be00b08`. `keytool -printcert` shows it is signed by `CN=Mohammed Hakmi, C=CA`, with the fingerprint above. The script printed no "NOT FOR UPLOAD" banner, and `dev/release-check.sh` passed every check.
+**Checked** on 28 October 2026. `dev/android.sh bundle` built `.dev-data/bundles/waraq-0.3.2-5.aab`, 74 MB, version 0.3.2, versionCode 5. It has the Paper loop icon and the Privacy policy row in Settings. `keytool -printcert` shows it is signed by `CN=Mohammed Hakmi, C=CA`, with the fingerprint above. The script printed no "NOT FOR UPLOAD" banner, and `dev/release-check.sh` passed every check.
 
-That bundle has neither the Paper loop icon nor the Privacy policy row in Settings. The icon is on main now. Build the bundle for the first upload, and for the closed test, only after the Privacy policy row is on main too. The script wrote versionCode 4 to `.dev-data/last-version-code`, so it builds versionCode 4 again only with the reuse flag:
-
-```sh
-dev/android.sh bundle --reuse-version-code
-```
-
-Play has never seen versionCode 4, so either bundle can be the first upload. After the first upload, raise `android.versionCode` for each new bundle.
+This is the bundle for the first upload. Play has never seen versionCode 5. After the first upload, raise `android.versionCode` in `app.config.ts` for each new bundle.
 
 ## 2. Store listing
 
