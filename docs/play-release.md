@@ -59,7 +59,7 @@ Play has never seen versionCode 4, so either bundle can be the first upload. Aft
 Scan, find, and file documents on the Paperless-ngx server you host yourself.
 ```
 
-**Full description** (2,190 of 4,000 characters). Every line is **Checked** against the code.
+**Full description** (2,283 of 4,000 characters). Every line is **Checked** against the code.
 
 ```text
 Waraq is an Android app for Paperless-ngx servers that you host yourself. Scan paper with your phone, file it on your server, and find any document again.
@@ -92,9 +92,11 @@ PRIVACY
 Waraq has no server of its own. It sends your documents and sign-in details only to the server you sign in to. It has no ads and no analytics of its own. The document scanner is part of Google Play services and runs on your phone. Google's ML Kit, which the scanner uses, sends diagnostic data to Google.
 
 Light and dark themes, following your phone or your choice.
+
+Waraq is open source under the MIT license. The code is at https://github.com/mhakmi/waraq.
 ```
 
-The design notes suggest "open-source" in the listing. Leave it out until the repo is public with a license. Today it has neither.
+The repo is public under the MIT license, so the last paragraph says so, as the design notes suggest.
 
 **Category.** Productivity.
 
@@ -135,7 +137,7 @@ The screenshots show the app before the Paper loop icon. No screen shows the app
 
 The policy text is in [privacy.md](privacy.md). It goes on `https://mhakmi.dev/waraq/privacy`, and that address goes in **App content > Privacy policy**.
 
-Google wants the policy in the Play Console field and reachable inside the app too ([privacy policy](https://support.google.com/googleplay/android-developer/answer/9888076)), as the [design](design.md#google-play-requirements-that-change-the-plan) notes. **Checked**: Settings has no link to it yet. Add a "Privacy policy" row in Settings before the closed test.
+Google wants the policy in the Play Console field and reachable inside the app too ([privacy policy](https://support.google.com/googleplay/android-developer/answer/9888076)), as the [design](design.md#google-play-requirements-that-change-the-plan) notes. **Checked**: Settings has a "Privacy policy" row in its "Other" group that opens that address, and a "Source code" row that opens the GitHub repo.
 
 ## 5. Data safety
 
