@@ -116,7 +116,20 @@ The design notes suggest "open-source" in the listing. Leave it out until the re
 swift dev/feature-graphic.swift /Users/mhakmi/mhakmi.dev/brand docs/play/feature-graphic.png
 ```
 
-`dev/play-screenshots.sh` takes the phone screenshots on the emulator, against the dev server's made-up documents. It sets a clean status bar with Android's demo mode: 12:00, a full battery, and full Wi-Fi. Claim and boot the emulator and install the newest bundle first, as the script's header says.
+`dev/play-screenshots.sh` takes the phone screenshots on the emulator, against the dev server's made-up documents. It sets a clean status bar with Android's demo mode: 12:00, a full battery, and full Wi-Fi. Claim and boot the emulator and install the newest bundle first, as the script's header says. Upload them in this order:
+
+| File | Screen |
+|---|---|
+| `01-documents.png` | Documents, sorted by title |
+| `02-document.png` | The page of one document |
+| `03-edit-custom-fields.png` | Edit details, with three custom fields changed |
+| `04-batch.png` | A batch of two scanned documents |
+| `05-batch-details.png` | Batch details, with the tag Bills for every document |
+| `06-uploads.png` | Uploads, with both documents done |
+| `07-settings.png` | Settings |
+| `08-documents-dark.png` | Documents in the dark theme |
+
+The screenshots show the app before the Paper loop icon. No screen shows the app icon, so they stay valid after the icon change.
 
 ## 4. Privacy policy
 
