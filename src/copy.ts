@@ -393,6 +393,8 @@ export const copy = {
     licenses: 'Open-source licenses',
     privacy: 'Privacy policy',
     sourceCode: 'Source code',
+    linkFailedTitle: 'No app can open this link',
+    linkFailed: (url: string) => `Open ${url} in a browser on any device.`,
     about: 'About',
     aboutText: (version: string) =>
       `${brand.displayName} ${version}. ${brand.displayName} is an independent client for Paperless-ngx. It is not made by or affiliated with the Paperless-ngx project.`,

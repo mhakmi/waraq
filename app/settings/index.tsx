@@ -21,6 +21,10 @@ import { unfinishedCount } from '../../src/upload/rows';
 const privacyUrl = 'https://mhakmi.dev/waraq/privacy';
 const sourceUrl = 'https://github.com/mhakmi/waraq';
 
+function openLink(url: string) {
+  Linking.openURL(url).catch(() => Alert.alert(copy.settings.linkFailedTitle, copy.settings.linkFailed(url)));
+}
+
 export default function SettingsScreen() {
   const colors = useColors();
   const router = useRouter();
@@ -61,8 +65,8 @@ export default function SettingsScreen() {
           <Row icon="shield" label={copy.settings.permissions} divided={false} onPress={() => router.push('/settings/permissions')} />
           <Row icon="bug" label={copy.settings.crashReport} divided onPress={() => router.push('/settings/crash-log')} />
           <Row icon="files" label={copy.settings.licenses} divided onPress={() => router.push('/settings/licenses')} />
-          <Row icon="lock" label={copy.settings.privacy} divided onPress={() => Linking.openURL(privacyUrl)} />
-          <Row icon="code" label={copy.settings.sourceCode} divided onPress={() => Linking.openURL(sourceUrl)} />
+          <Row icon="lock" label={copy.settings.privacy} divided onPress={() => openLink(privacyUrl)} />
+          <Row icon="code" label={copy.settings.sourceCode} divided onPress={() => openLink(sourceUrl)} />
           <View style={[styles.about, { borderTopColor: colors.line }]}>
             <View style={styles.aboutHead}>
               <Icon name="info" color={colors.ink} />
