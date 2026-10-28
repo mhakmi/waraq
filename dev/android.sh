@@ -534,9 +534,30 @@ edit_title() {
   adb shell input text "%s2026"
   wait_for "Save 1 change" 5
   shot "$run-12-edit-changed"
+  discard_then_edit_again "$run"
   tap "Save 1 change"
   wait_for "Electricity bill, September 2026" 20
   shot "$run-13-document-saved"
+}
+
+discard_then_edit_again() {
+  local run=$1
+  tap "Cancel"
+  wait_for "Discard your changes?" 5
+  shot "$run-12-discard-asked"
+  tap "KEEP EDITING"
+  wait_for "Save 1 change" 5
+  tap "Cancel"
+  wait_for "Discard your changes?" 5
+  tap "DISCARD"
+  wait_for "Details" 10
+  shot "$run-12-discarded"
+  tap "Edit"
+  wait_for "Edit details" 10
+  tap "Title" android.widget.EditText
+  adb shell input keyevent KEYCODE_MOVE_END
+  adb shell input text "%s2026"
+  wait_for "Save 1 change" 5
 }
 
 done_and_undo() {

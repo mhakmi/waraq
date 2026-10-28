@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useLocalSearchParams, useNavigation, usePreventRemove, useRouter } from 'expo-router';
+import { useLocalSearchParams, usePreventRemove, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -69,7 +69,6 @@ function EditForm({ document, customFields }: { document: DocumentDetail; custom
   const colors = useColors();
   const client = useClient();
   const router = useRouter();
-  const navigation = useNavigation();
   const queryClient = useQueryClient();
   const { account } = useSignedIn();
   const labels = useLabels();
@@ -78,6 +77,7 @@ function EditForm({ document, customFields }: { document: DocumentDetail; custom
   const [archiveText, setArchiveText] = useState(original.archiveSerialNumber === null ? '' : String(original.archiveSerialNumber));
   const [picker, setPicker] = useState<PickerOpen>(null);
   const [customEdits, setCustomEdits] = useState<CustomFieldEdit[]>(() => customFieldEdits(document.customFields, customFields));
+  const [discarded, setDiscarded] = useState(false);
   const createLabel = useCreateLabel();
   const can = useCan();
 
@@ -104,10 +104,17 @@ function EditForm({ document, customFields }: { document: DocumentDetail; custom
     },
   });
 
-  usePreventRemove(changeCount > 0 && !save.isSuccess, ({ data }) => {
+  usePreventRemove(changeCount > 0 && !save.isSuccess && !discarded, ({ repeat }) => {
     Alert.alert(copy.edit.discardTitle, copy.edit.discardMessage, [
       { text: copy.edit.keepEditing, style: 'cancel' },
-      { text: copy.edit.discard, style: 'destructive', onPress: () => navigation.dispatch(data.action) },
+      {
+        text: copy.edit.discard,
+        style: 'destructive',
+        onPress: () => {
+          setDiscarded(true);
+          repeat();
+        },
+      },
     ]);
   });
 
