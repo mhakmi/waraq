@@ -1,3 +1,5 @@
+<img src="assets/icon/launcher.svg" width="96" alt="Waraq icon">
+
 # Waraq
 
 An Android app for scanning paper documents into your own Paperless-ngx server. Waraq is a working name.
@@ -20,6 +22,7 @@ Waraq needs Paperless-ngx 3.0 or newer. It talks to the REST API at version 10.
 - `src/copy.ts` holds every word the app shows. Screens take their text from it.
 - `plugins/network-security.ts` writes Android's network security config. It trusts certificate authorities that the user installed, and allows plain HTTP, which `normalizeServerUrl` then allows only for addresses on a home network or VPN.
 - `src/brand.json` holds the app name, slug, and Android package. Change them there.
+- `assets/icon/` holds the app icon. `app.config.ts` builds the adaptive icon from the foreground and monochrome layers on a `#1f3b6e` background, and the older launchers use `launcher-192.png`. `store-512.png` is the Google Play icon.
 
 Four libraries came in with the document screens. `@tanstack/react-query-persist-client` saves the query cache. `@react-native-community/datetimepicker` opens Android's date dialog. `expo-file-system` writes downloaded files and hands them to the phone's PDF app. `expo-sharing` opens the share sheet. None of them adds an Android permission.
 
