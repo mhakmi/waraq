@@ -6,13 +6,13 @@ const config: ExpoConfig = {
   name: brand.displayName,
   slug: brand.slug,
   scheme: brand.slug,
-  version: '0.3.1',
+  version: '0.3.2',
   orientation: 'portrait',
   userInterfaceStyle: 'automatic',
   icon: './assets/icon/launcher-192.png',
   android: {
     package: brand.androidPackage,
-    versionCode: 4,
+    versionCode: 5,
     adaptiveIcon: {
       foregroundImage: './assets/icon/adaptive-foreground-1024.png',
       monochromeImage: './assets/icon/adaptive-monochrome-1024.png',
