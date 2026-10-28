@@ -9,6 +9,8 @@ type PackageJson = {
   licenses?: { type: string }[];
   dependencies?: Record<string, string>;
   optionalDependencies?: Record<string, string>;
+  os?: string[];
+  cpu?: string[];
 };
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
@@ -50,6 +52,10 @@ for (let next = waiting.pop(); next !== undefined; next = waiting.pop()) {
     continue;
   }
   const pkg = readPackage(folder);
+  // Only the build machine's own native binaries are installed, so listing them would make the file differ between machines.
+  if (pkg.os !== undefined || pkg.cpu !== undefined) {
+    continue;
+  }
   const key = `${pkg.name}@${pkg.version}`;
   if (found.has(key)) {
     continue;

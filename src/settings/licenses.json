@@ -555,11 +555,6 @@
     "license": "MIT"
   },
   {
-    "name": "@noxcturnal/noxcturnal-darwin-arm64",
-    "version": "0.1.4",
-    "license": "MIT"
-  },
-  {
     "name": "@oxc-project/types",
     "version": "0.154.0",
     "license": "MIT"
@@ -1636,11 +1631,6 @@
   },
   {
     "name": "lightningcss",
-    "version": "1.33.0",
-    "license": "MPL-2.0"
-  },
-  {
-    "name": "lightningcss-darwin-arm64",
     "version": "1.33.0",
     "license": "MPL-2.0"
   },
