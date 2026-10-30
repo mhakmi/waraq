@@ -1,0 +1,7 @@
+- Waraq now opens on Documents, which is the first tab.
+- Mark every Inbox document done at once, with undo.
+- Sheets can be dragged up, dragged down, and flung closed.
+- Batch screens stay smooth with many scanned pages.
+- The tab highlight stays rounded.
+- Better TalkBack labels, larger touch targets, and layouts that hold at the largest font size.
+- Sign-in names the missing permission when the server refuses it.

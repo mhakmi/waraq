@@ -78,6 +78,19 @@ When some of the variables are set and others are not, the script stops. When no
 dev/android.sh bundle --reuse-version-code
 ```
 
+## GitHub Releases
+
+`.github/workflows/release.yml` publishes APKs on the repo's Releases page. [release-research.md](release-research.md) explains why it works this way.
+
+1. Write the notes for the release in `fastlane/metadata/android/en-US/changelogs/<versionCode>.txt`, in under 500 characters. Paste the same text into Play's "What's new".
+2. Push a tag that matches `version` in `app.config.ts`, for example `git tag v0.3.2 && git push origin v0.3.2`. To build a tag made before its notes were written, run the workflow by hand from main: `gh workflow run release.yml -f tag=v0.3.2`.
+3. The workflow builds one APK per ABI and a universal APK. It signs them with the app signing key, writes `SHA256SUMS`, attests where each APK was built, and drafts a release. A `v0.*` tag, or a tag with a `-` in it, becomes a pre-release.
+4. Read the draft on the Releases page and publish it.
+
+The APKs are signed with the app signing key, the same key Play signs with, so a copy from GitHub and a copy from Play can update each other. That holds only if Play App Signing is set up with "use my own key" and this key, before the first open test or production release. The upload key never signs a GitHub APK.
+
+The workflow reads four secrets from the `release` environment: `WARAQ_SIGNING_KEYSTORE_BASE64`, `WARAQ_SIGNING_KEY_ALIAS`, `WARAQ_SIGNING_STORE_PASSWORD`, and `WARAQ_SIGNING_KEY_PASSWORD`. Without them, it builds the APKs, stops at the Sign step, and publishes nothing.
+
 ## What the release check looks at
 
 `dev/release-check.sh <apk or aab>` fails when any of these is true. For an app bundle, it checks the universal APK that bundletool makes from it, which holds every native library and the same manifest.
