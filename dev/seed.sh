@@ -1,11 +1,12 @@
 #!/bin/bash
-# Loads the synthetic sample documents into the local Paperless-ngx.
+# Loads the synthetic sample documents into a Paperless-ngx, the local one by default.
+# PAPERLESS_URL and PAPERLESS_AUTH (user:password) point it at another server.
 # Safe to run twice: it creates only the labels and documents that are missing.
 set -euo pipefail
 
 HERE=$(cd "$(dirname "$0")" && pwd)
 URL=${PAPERLESS_URL:-http://localhost:8010}
-AUTH=admin:waraq-dev-password
+AUTH=${PAPERLESS_AUTH:-admin:waraq-dev-password}
 ACCEPT="Accept: application/json; version=9"
 
 api() {
