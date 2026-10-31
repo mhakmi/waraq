@@ -224,7 +224,7 @@ Testers need a Paperless-ngx 3.0 server of their own, or the demo server.
 
 In Play Console, do these steps. The menu names are **Inferred**, because Console was not opened for this page.
 
-1. Make a Google Group, for example `waraq-testers@googlegroups.com`, and set it so people can ask to join. A group is easier than an email list, because you add people in the group and not in Console.
+1. Make a Google Group. Waraq's is `waraq-alpha-testers@googlegroups.com`, at <https://groups.google.com/g/waraq-alpha-testers>. Set **Who can join group** to **Anyone on the web can join**, so testers do not wait for approval. A group is easier than an email list, because you add people in the group and not in Console.
 2. Go to **Test and release > Testing > Closed testing** and create a track.
 3. Under **Testers**, add the Google Group.
 4. Choose the countries, starting with Canada and the United States.
@@ -244,7 +244,7 @@ What to tell testers:
 ```text
 Thanks for testing Waraq, an Android app for Paperless-ngx 3.0 and newer.
 
-1. Join the group: <group link>
+1. Join the group: https://groups.google.com/g/waraq-alpha-testers
 2. Open this link on your phone and tap "Become a tester": <opt-in link>
 3. Install Waraq from the Play Store.
 4. Sign in to your own Paperless-ngx server, or to the demo server:
