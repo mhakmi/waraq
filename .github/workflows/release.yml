@@ -90,7 +90,8 @@ jobs:
       - name: Sign
         env:
           KEYSTORE_BASE64: ${{ secrets.WARAQ_SIGNING_KEYSTORE_BASE64 }}
-          KEY_ALIAS: ${{ secrets.WARAQ_SIGNING_KEY_ALIAS }}
+          # The alias is a variable, not a secret, because GitHub would hide every "waraq" in the logs.
+          KEY_ALIAS: ${{ vars.WARAQ_SIGNING_KEY_ALIAS }}
           STORE_PASSWORD: ${{ secrets.WARAQ_SIGNING_STORE_PASSWORD }}
           KEY_PASSWORD: ${{ secrets.WARAQ_SIGNING_KEY_PASSWORD }}
         run: |
@@ -111,8 +112,13 @@ jobs:
               --out "dist/waraq-$TAG-$abi.apk" "$apk"
           done
           rm "$keystore"
-          "$apksigner" verify --print-certs "dist/waraq-$TAG-universal.apk" \
-            | sed -nE 's/^Signer #1 certificate SHA-256 digest: //p' > "$RUNNER_TEMP/release/fingerprint.txt"
+          "$apksigner" verify --print-certs "dist/waraq-$TAG-universal.apk" | tee "$RUNNER_TEMP/release/certs.txt"
+          fingerprint=$(sed -nE 's/.*SHA-256 digest: ([0-9a-f]{64}).*/\1/p' "$RUNNER_TEMP/release/certs.txt" | head -1)
+          if [ -z "$fingerprint" ]; then
+            echo "::error::apksigner printed no SHA-256 digest for the signing certificate"
+            exit 1
+          fi
+          echo "$fingerprint" | tr a-f A-F | sed 's/../&:/g; s/:$//' > "$RUNNER_TEMP/release/fingerprint.txt"
           (cd dist && sha256sum -- *.apk > SHA256SUMS)
           cat dist/SHA256SUMS
 

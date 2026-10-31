@@ -89,7 +89,7 @@ dev/android.sh bundle --reuse-version-code
 
 The APKs are signed with the app signing key, the same key Play signs with, so a copy from GitHub and a copy from Play can update each other. That holds only if Play App Signing is set up with "use my own key" and this key, before the first open test or production release. The upload key never signs a GitHub APK.
 
-The workflow reads four secrets from the `release` environment: `WARAQ_SIGNING_KEYSTORE_BASE64`, `WARAQ_SIGNING_KEY_ALIAS`, `WARAQ_SIGNING_STORE_PASSWORD`, and `WARAQ_SIGNING_KEY_PASSWORD`. Without them, it builds the APKs, stops at the Sign step, and publishes nothing.
+The workflow reads three secrets from the `release` environment, `WARAQ_SIGNING_KEYSTORE_BASE64`, `WARAQ_SIGNING_STORE_PASSWORD`, and `WARAQ_SIGNING_KEY_PASSWORD`, and the variable `WARAQ_SIGNING_KEY_ALIAS`. The alias is a variable because GitHub hides a secret's value wherever it shows up in the logs, and the alias is `waraq`. Without them, it builds the APKs, stops at the Sign step, and publishes nothing.
 
 ## What the release check looks at
 
