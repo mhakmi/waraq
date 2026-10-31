@@ -152,7 +152,7 @@ Waraq has an upload key and no Play app yet. Two choices were asked about.
 
 There is a third path on Google's page. Let Google generate the key, then download Play's signed universal APK and attach it to GitHub. Signatures match and you hold no key. But the GitHub file is Play's build of the bundle, not a CI build, so the attestation below would vouch for a download rather than a build. GitHub releases also wait for Play processing.
 
-My recommendation is (a). Waraq stores the user's own receipts on the phone, so a forced uninstall to switch channels costs real data. Same-key is what the well-run apps that ship both channels do. Do not sign GitHub APKs with the upload key. That would make a resettable key into a key users depend on (**Inferred**). The guards for (a):
+My recommendation is (a). Waraq keeps scans that are not uploaded yet, unfinished uploads, and the signed-in account on the phone, so a forced uninstall to switch channels can lose a user's scans and makes them sign in again. Same-key is what the well-run apps that ship both channels do. Do not sign GitHub APKs with the upload key. That would make a resettable key into a key users depend on (**Inferred**). The guards for (a):
 
 1. Generate the app signing key offline, RSA 4096. Keep two offline backups, and keep it apart from the upload key.
 2. Put it only in a GitHub environment named `release` with a required reviewer. That is you, so a stray workflow cannot sign.
