@@ -1,10 +1,10 @@
 # Waraq privacy policy
 
-Last updated: 28 October 2026
+Last updated: 31 October 2026
 
 Waraq is an Android app for Paperless-ngx servers that you run yourself. Mohammed Hakmi makes Waraq. It is an independent app, and it is not made by or affiliated with the Paperless-ngx project.
 
-Waraq has no server of its own. It talks only to the Paperless-ngx server whose address you type in. Waraq adds no analytics, no ads, and no crash reporting service of its own.
+Waraq has no server of its own. It talks only to the Paperless-ngx server whose address you type in. The one exception is Google's document scanner, described below. Waraq adds no analytics, no ads, and no crash reporting service of its own.
 
 ## What Waraq keeps on your phone
 
@@ -12,13 +12,13 @@ Waraq has no server of its own. It talks only to the Paperless-ngx server whose 
 - **Copies of your server's data.** Document lists, document details, labels, and thumbnails are kept so the app can show them at once and while you are offline. Documents that you open are kept in the app's cache folder, up to 200 MB. Your recent searches are kept too.
 - **Scans and uploads.** Pages that you scan, and files that you pick or share into Waraq, are kept in the app's files folder until you upload or discard them. After an upload finishes, Waraq deletes its PDF and keeps a short record of the upload for a week, so the Uploads tab can show it.
 - **Your theme choice.**
-- **A crash log.** If the app hits an error, Waraq writes the time, the kind of error, the app and Android versions, the error message, and where in the code it happened. Before it writes an entry, Waraq removes your token, your header values, and anything that looks like a password or key. The log stays on your phone. It leaves the phone only if you open **Settings**, tap **Send a crash report**, and choose where to send it.
+- **A crash log.** If the app hits an error, Waraq writes the time, the kind of error, the app and Android versions, the error message, and where in the code it happened. Before it writes an entry, Waraq removes your token, your header values, and anything that looks like a password or key. The log stays on your phone. It leaves the phone only if you open **Settings**, tap **Send a crash report**, and pick an app and a recipient in Android's share menu. Waraq fills in no recipient and sends the log nowhere by itself. To report a problem to the maker, send it to the address under [Contact](#contact).
 
 Android's backup is turned off for Waraq, so none of this goes into your Google backup.
 
 ## What Waraq sends, and where
 
-Waraq sends data only to your own Paperless-ngx server, and through any proxy you put in front of it:
+Apart from Google's document scanner, described in the next section, Waraq sends data only to your own Paperless-ngx server, and through any proxy you put in front of it:
 
 - your username and password or API token, to sign in,
 - requests to list, search, open, and edit your documents, notes, labels, and saved views,
@@ -32,11 +32,11 @@ If your server address starts with `https://`, the connection is encrypted. Wara
 
 To scan paper, Waraq opens Google's document scanner, which is part of Google Play services on your phone. The scanner runs on the phone and gives Waraq only the pages that you keep. Google's ML Kit, which the scanner is built on, sends Google diagnostic and usage data, such as device and app information and performance numbers, with an identifier for each installation. Google says it does not pass this data to third parties. Read Google's [ML Kit data disclosure](https://developers.google.com/ml-kit/android-data-disclosure) for the details. Google Play services has its own terms with Google.
 
-Waraq uses no other third-party service.
+Apart from the scanner, Waraq uses no third-party service.
 
 ## Permissions
 
-Waraq asks for network access, to reach your server, and for permission to keep the phone awake and to start again after a restart, so unfinished uploads can finish in the background. It does not ask for your camera, photos, files, contacts, or location. Files come in through Android's own file picker and share menu.
+Waraq asks for network access, to reach your server, and for permission to keep the phone awake and to start again after a restart, so unfinished uploads can finish in the background. It also declares one permission of its own, which only Waraq can hold. Android uses it to stop other apps from sending messages to parts of Waraq. It does not ask for your camera, photos, files, contacts, or location. Files come in through Android's own file picker and share menu.
 
 ## How to delete your data
 
